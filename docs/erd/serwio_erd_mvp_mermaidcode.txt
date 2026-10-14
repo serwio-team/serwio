@@ -1,0 +1,221 @@
+erDiagram
+    USER_ACCOUNT {
+        uuid id PK
+        varchar email UK
+        varchar password_hash
+        varchar role
+        varchar status
+        timestamptz created_at
+    }
+    ASSET_OWNER {
+        uuid id PK
+        uuid user_id FK,UK
+        varchar name
+        timestamptz created_at
+    }
+    SERVICE_COMPANY {
+        uuid id PK
+        uuid user_id FK,UK
+        varchar name
+        timestamptz created_at
+    }
+    SERVICE_BRANCH {
+        uuid id PK
+        uuid service_company_id FK
+        varchar name
+        boolean active
+        timestamptz created_at
+    }
+    TECHNICIAN {
+        uuid id PK
+        uuid user_id FK,UK
+        uuid branch_id FK
+        varchar display_name
+        boolean active
+        timestamptz created_at
+    }
+    TECHNICIAN_BRANCH_HISTORY {
+        uuid id PK
+        uuid technician_id FK
+        uuid branch_id FK
+        uuid changed_by_user_id FK
+        timestamptz valid_from
+        timestamptz valid_to
+    }
+    LOCATION {
+        uuid id PK
+        uuid asset_owner_id FK
+        varchar name
+        varchar address_line
+        varchar city
+        varchar postal_code
+        varchar country
+        varchar timezone
+        timestamptz created_at
+    }
+    LOCATION_AVAILABILITY {
+        uuid id PK
+        uuid location_id FK
+        smallint day_of_week
+        time available_from
+        time available_to
+    }
+    SERVICE_OBJECT {
+        uuid id PK
+        uuid location_id FK
+        uuid public_id UK
+        varchar name
+        text description
+        varchar type
+        varchar manufacturer
+        varchar model
+        varchar serial_number
+        jsonb attributes
+        timestamptz qr_generated_at
+        boolean active
+        timestamptz created_at
+    }
+    COMPANY_OBJECT_SERVICE {
+        uuid id PK
+        uuid service_company_id FK
+        uuid service_object_id FK
+        uuid authorized_by_user_id FK
+        timestamptz valid_from
+        timestamptz valid_to
+    }
+    SERVICE_ORDER {
+        uuid id PK
+        uuid service_object_id FK
+        uuid service_company_id FK
+        uuid created_by_user_id FK
+        uuid coordinator_technician_id FK
+        varchar order_type
+        text description
+        varchar current_status
+        timestamptz created_at
+        timestamptz closed_at
+    }
+    ORDER_BRANCH_ASSIGNMENT {
+        uuid id PK
+        uuid service_order_id FK
+        uuid branch_id FK
+        uuid assigned_by_user_id FK
+        timestamptz assigned_at
+        timestamptz unassigned_at
+    }
+    ORDER_TECHNICIAN_ASSIGNMENT {
+        uuid id PK
+        uuid service_order_id FK
+        uuid technician_id FK
+        uuid assigned_by_user_id FK
+        timestamptz assigned_at
+        timestamptz unassigned_at
+    }
+    SERVICE_VISIT {
+        uuid id PK
+        uuid service_order_id FK
+        uuid coordinator_technician_id FK
+        uuid accepted_proposal_id FK,UK
+        timestamptz starts_at
+        timestamptz ends_at
+        varchar status
+        timestamptz created_at
+    }
+    VISIT_TECHNICIAN {
+        uuid visit_id PK,FK
+        uuid technician_id PK,FK
+    }
+    VISIT_PROPOSAL {
+        uuid id PK
+        uuid visit_id FK
+        uuid proposed_by_user_id FK
+        uuid responded_by_user_id FK
+        timestamptz proposed_starts_at
+        timestamptz proposed_ends_at
+        varchar status
+        timestamptz created_at
+        timestamptz responded_at
+    }
+    ORDER_STATUS_HISTORY {
+        uuid id PK
+        uuid service_order_id FK
+        uuid changed_by_user_id FK
+        varchar status
+        timestamptz changed_at
+    }
+    SERVICE_REPORT {
+        uuid id PK
+        uuid service_order_id FK,UK
+        uuid author_technician_id FK
+        text actions_done
+        text diagnosis
+        text resolution
+        text used_materials
+        text recommendations
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz finalized_at
+    }
+    STORED_FILE {
+        uuid id PK
+        uuid uploaded_by_user_id FK
+        varchar storage_key UK
+        varchar original_name
+        varchar mime_type
+        bigint size_bytes
+        timestamptz created_at
+    }
+    SERVICE_OBJECT_FILE {
+        uuid id PK
+        uuid service_object_id FK
+        uuid file_id FK
+        varchar type
+    }
+    SERVICE_REPORT_FILE {
+        uuid id PK
+        uuid service_report_id FK
+        uuid file_id FK
+        varchar type
+    }
+
+    USER_ACCOUNT ||--o| ASSET_OWNER : owner_profile
+    USER_ACCOUNT ||--o| SERVICE_COMPANY : company_profile
+    USER_ACCOUNT ||--o| TECHNICIAN : technician_profile
+    SERVICE_COMPANY ||--|{ SERVICE_BRANCH : has
+    SERVICE_BRANCH ||--o{ TECHNICIAN : current_branch
+    TECHNICIAN ||--|{ TECHNICIAN_BRANCH_HISTORY : memberships
+    SERVICE_BRANCH ||--o{ TECHNICIAN_BRANCH_HISTORY : membership_branch
+    USER_ACCOUNT ||--o{ TECHNICIAN_BRANCH_HISTORY : changes_membership
+    ASSET_OWNER ||--o{ LOCATION : owns
+    LOCATION ||--o{ LOCATION_AVAILABILITY : opening_hours
+    LOCATION ||--o{ SERVICE_OBJECT : contains
+    SERVICE_COMPANY ||--o{ COMPANY_OBJECT_SERVICE : services
+    SERVICE_OBJECT ||--o{ COMPANY_OBJECT_SERVICE : covered_by
+    USER_ACCOUNT ||--o{ COMPANY_OBJECT_SERVICE : authorizes
+    SERVICE_OBJECT ||--o{ SERVICE_ORDER : has_orders
+    SERVICE_COMPANY ||--o{ SERVICE_ORDER : handles
+    USER_ACCOUNT ||--o{ SERVICE_ORDER : creates
+    TECHNICIAN |o--o{ SERVICE_ORDER : coordinates_order
+    SERVICE_ORDER ||--o{ ORDER_BRANCH_ASSIGNMENT : branch_assignments
+    SERVICE_BRANCH ||--o{ ORDER_BRANCH_ASSIGNMENT : assigned_branch
+    USER_ACCOUNT ||--o{ ORDER_BRANCH_ASSIGNMENT : assigns_branch
+    SERVICE_ORDER ||--o{ ORDER_TECHNICIAN_ASSIGNMENT : person_assignments
+    TECHNICIAN ||--o{ ORDER_TECHNICIAN_ASSIGNMENT : assigned_person
+    USER_ACCOUNT ||--o{ ORDER_TECHNICIAN_ASSIGNMENT : assigns_person
+    SERVICE_ORDER ||--o{ SERVICE_VISIT : visits
+    TECHNICIAN ||--o{ SERVICE_VISIT : coordinates_visit
+    SERVICE_VISIT ||--|{ VISIT_TECHNICIAN : performers
+    TECHNICIAN ||--o{ VISIT_TECHNICIAN : performs
+    SERVICE_VISIT ||--o{ VISIT_PROPOSAL : proposals
+    VISIT_PROPOSAL |o--o| SERVICE_VISIT : accepted_proposal
+    USER_ACCOUNT ||--o{ VISIT_PROPOSAL : proposes
+    USER_ACCOUNT |o--o{ VISIT_PROPOSAL : responds
+    SERVICE_ORDER ||--|{ ORDER_STATUS_HISTORY : status_history
+    USER_ACCOUNT ||--o{ ORDER_STATUS_HISTORY : changes_status
+    SERVICE_ORDER ||--o| SERVICE_REPORT : report
+    TECHNICIAN ||--o{ SERVICE_REPORT : authors
+    USER_ACCOUNT ||--o{ STORED_FILE : uploads
+    SERVICE_OBJECT ||--o{ SERVICE_OBJECT_FILE : documentation
+    STORED_FILE ||--o{ SERVICE_OBJECT_FILE : object_file
+    SERVICE_REPORT ||--o{ SERVICE_REPORT_FILE : attachments
+    STORED_FILE ||--o{ SERVICE_REPORT_FILE : report_file

@@ -1,0 +1,5 @@
+# Lokalne ustawienia i hasła nie trafiają do repozytorium.
+.env
+.env.*
+# Szablon konfiguracji pozostaje widoczny dla Git.
+!.env.example

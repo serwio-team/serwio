@@ -8,6 +8,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import serwio.asset.dto.ServiceObjectListItemResponse;
 import serwio.asset.dto.ServiceObjectPageResponse;
 import serwio.asset.dto.ServiceObjectRequest;
 import serwio.asset.dto.ServiceObjectResponse;
@@ -29,7 +30,7 @@ public class ServiceObjectService {
         var result = locationId == null
                 ? objects.findAllByActiveTrue(pageable)
                 : objects.findAllByActiveTrueAndLocationId(locationId, pageable);
-        return new ServiceObjectPageResponse(result.getContent().stream().map(this::toResponse).toList(),
+        return new ServiceObjectPageResponse(result.getContent().stream().map(this::toListItemResponse).toList(),
                 result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
     }
 
@@ -70,6 +71,11 @@ public class ServiceObjectService {
         object.setModel(request.model());
         object.setSerialNumber(request.serialNumber());
         object.setAttributes(request.attributes());
+    }
+
+    private ServiceObjectListItemResponse toListItemResponse(ServiceObject object) {
+        return new ServiceObjectListItemResponse(object.getId(), object.getName(), object.getType(),
+                object.getLocation().getId(), object.getLocation().getName());
     }
 
     private ServiceObjectResponse toResponse(ServiceObject object) {

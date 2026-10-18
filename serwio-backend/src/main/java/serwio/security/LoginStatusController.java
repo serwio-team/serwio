@@ -12,6 +12,8 @@ public class LoginStatusController {
         return Map.of(
                 "message", "Zalogowano pomyślnie",
                 "endpoints", List.of(
+                        "GET /api/users/me",
+                        "GET /api/owners/me",
                         "GET /api/locations",
                         "GET /api/locations/{id}",
                         "POST /api/locations",

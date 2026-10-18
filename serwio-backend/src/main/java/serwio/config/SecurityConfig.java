@@ -10,6 +10,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import serwio.security.LoginHandlers;
 
 @Configuration(proxyBeanMethods = false)
 public class SecurityConfig {
@@ -19,16 +20,20 @@ public class SecurityConfig {
     }
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, LoginHandlers loginHandlers) throws Exception {
         return http
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/csrf").permitAll()
+                        .requestMatchers("/api/users/me").authenticated()
+                        .requestMatchers("/api/owners/me").hasRole("ASSET_OWNER")
                         .requestMatchers("/api", "/api/locations", "/api/locations/**",
                                 "/api/service-objects", "/api/service-objects/**").hasRole("ASSET_OWNER")
                         .anyRequest().authenticated())
                 .requestCache(cache -> cache.disable())
                 .formLogin(form -> form
                         .defaultSuccessUrl("/api", true)
+                        .successHandler(loginHandlers::onSuccess)
+                        .failureHandler(loginHandlers::onFailure)
                         .permitAll())
                 .logout(Customizer.withDefaults())
                 .exceptionHandling(exceptions -> exceptions.defaultAuthenticationEntryPointFor(

@@ -264,6 +264,105 @@ class OwnerFlowTest {
         }
     }
 
+    @Test
+    void currentProfilesReturnOnlyOwnPublicFields() throws Exception {
+        var session = login(accountA.getEmail());
+        mvc.perform(get("/api/users/me").session(session).param("userId", accountB.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", aMapWithSize(5)))
+                .andExpect(jsonPath("$.id").value(accountA.getId().toString()))
+                .andExpect(jsonPath("$.email").value(accountA.getEmail()))
+                .andExpect(jsonPath("$.role").value("ASSET_OWNER"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.createdAt").isString())
+                .andExpect(jsonPath("$.passwordHash").doesNotExist());
+        mvc.perform(get("/api/owners/me").session(session).param("userId", accountB.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", aMapWithSize(4)))
+                .andExpect(jsonPath("$.id").value(ownerA.getId().toString()))
+                .andExpect(jsonPath("$.userId").value(accountA.getId().toString()))
+                .andExpect(jsonPath("$.name").value(ownerA.getName()))
+                .andExpect(jsonPath("$.createdAt").isString());
+        var otherSession = login(accountB.getEmail());
+        mvc.perform(get("/api/users/me").session(otherSession))
+                .andExpect(jsonPath("$.id").value(accountB.getId().toString()));
+        mvc.perform(get("/api/owners/me").session(otherSession))
+                .andExpect(jsonPath("$.userId").value(accountB.getId().toString()));
+    }
+
+    @Test
+    void currentProfilesEnforceAuthenticationRoleAndMissingProfile() throws Exception {
+        mvc.perform(get("/api/users/me")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/owners/me")).andExpect(status().isUnauthorized());
+        var technician = account("ACTIVE", "TECHNICIAN");
+        var session = login(technician.getEmail());
+        mvc.perform(get("/api/users/me").session(session))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.role").value("TECHNICIAN"));
+        mvc.perform(get("/api/owners/me").session(session)).andExpect(status().isForbidden());
+        var withoutProfile = account("ACTIVE", "ASSET_OWNER");
+        mvc.perform(get("/api/owners/me").session(login(withoutProfile.getEmail())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Konto nie ma profilu właściciela"));
+    }
+
+    @Test
+    void jsonLoginReturnsApiStatusAndCreatesUsableSession() throws Exception {
+        var result = mvc.perform(post("/login").with(csrf()).accept(MediaType.APPLICATION_JSON)
+                        .param("username", accountA.getEmail()).param("password", PASSWORD))
+                .andExpect(status().isOk()).andExpect(authenticated().withUsername(accountA.getEmail()))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(header().doesNotExist("Location"))
+                .andExpect(jsonPath("$.message").value("Zalogowano pomyślnie"))
+                .andExpect(jsonPath("$.endpoints", hasItem("GET /api/users/me")))
+                .andReturn();
+        var session = (MockHttpSession) result.getRequest().getSession(false);
+        mvc.perform(get("/api").session(session))
+                .andExpect(content().json(result.getResponse().getContentAsString()));
+        mvc.perform(get("/api/users/me").session(session))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.email").value(accountA.getEmail()));
+    }
+
+    @Test
+    void jsonLoginRejectsWrongUnknownAndInactiveAccountsWithSameMessage() throws Exception {
+        accountB.setStatus("INACTIVE");
+        accounts.saveAndFlush(accountB);
+        for (var email : new String[]{accountA.getEmail(), "unknown@example.com", accountB.getEmail()}) {
+            mvc.perform(post("/login").with(csrf()).accept(MediaType.APPLICATION_JSON)
+                            .param("username", email)
+                            .param("password", email.equals(accountA.getEmail()) ? "wrong" : PASSWORD))
+                    .andExpect(status().isUnauthorized()).andExpect(unauthenticated())
+                    .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                    .andExpect(header().doesNotExist("Location"))
+                    .andExpect(jsonPath("$.detail").value("Nieprawidłowy e-mail lub hasło"));
+        }
+    }
+
+    @Test
+    void jsonLoginStillRequiresValidCsrf() throws Exception {
+        mvc.perform(post("/login").accept(MediaType.APPLICATION_JSON)
+                        .param("username", accountA.getEmail()).param("password", PASSWORD))
+                .andExpect(status().isForbidden()).andExpect(unauthenticated());
+        mvc.perform(post("/login").with(csrf().useInvalidToken()).accept(MediaType.APPLICATION_JSON)
+                        .param("username", accountA.getEmail()).param("password", PASSWORD))
+                .andExpect(status().isForbidden()).andExpect(unauthenticated());
+    }
+
+    @Test
+    void browserLoginKeepsRedirectsAndJsonOptInHandlesAcceptParameters() throws Exception {
+        for (var accept : new String[]{"text/html", "*/*", "application/json;q=0", "invalid"}) {
+            mvc.perform(post("/login").with(csrf()).header("Accept", accept)
+                            .param("username", accountA.getEmail()).param("password", PASSWORD))
+                    .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/api"));
+            mvc.perform(post("/login").with(csrf()).header("Accept", accept)
+                            .param("username", accountA.getEmail()).param("password", "wrong"))
+                    .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/login?error"));
+        }
+        mvc.perform(post("/login").with(csrf()).header("Accept", "application/json;charset=UTF-8, */*;q=0.1")
+                        .param("username", accountA.getEmail()).param("password", PASSWORD))
+                .andExpect(status().isOk()).andExpect(authenticated());
+        mvc.perform(get("/login")).andExpect(status().isOk());
+    }
+
     private MockHttpSession login(String email) throws Exception {
         var result = mvc.perform(formLogin().user(email).password(PASSWORD))
                 .andExpect(authenticated().withUsername(email)).andExpect(redirectedUrl("/api")).andReturn();

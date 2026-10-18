@@ -2,19 +2,21 @@ package serwio.asset.service;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import serwio.asset.dto.ServiceObjectPageResponse;
+import serwio.asset.dto.ServiceObjectListItemResponse;
 import serwio.asset.dto.ServiceObjectRequest;
 import serwio.asset.dto.ServiceObjectResponse;
 import serwio.asset.model.ServiceObject;
 import serwio.asset.repository.ServiceObjectRepository;
 import serwio.exception.ResourceNotFoundException;
 import serwio.location.repository.LocationRepository;
+import serwio.security.CurrentUser;
 
 @Service
 @RequiredArgsConstructor
@@ -22,19 +24,21 @@ import serwio.location.repository.LocationRepository;
 public class ServiceObjectService {
     private final ServiceObjectRepository objects;
     private final LocationRepository locations;
+    private final CurrentUser currentUser;
 
-    public ServiceObjectPageResponse list(UUID locationId, int page, int size) {
+    public List<ServiceObjectListItemResponse> list(UUID locationId, int page, int size) {
         var pageable = PageRequest.of(page, size, Sort.by(
                 Sort.Order.desc("createdAt"), Sort.Order.asc("id")));
         var result = locationId == null
-                ? objects.findAllByActiveTrue(pageable)
-                : objects.findAllByActiveTrueAndLocationId(locationId, pageable);
-        return new ServiceObjectPageResponse(result.getContent().stream().map(this::toResponse).toList(),
-                result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
+                ? objects.findAllByActiveTrueAndLocationAssetOwnerUserId(currentUser.id(), pageable)
+                : objects.findAllByActiveTrueAndLocationIdAndLocationAssetOwnerUserId(
+                        locationId, currentUser.id(), pageable);
+        return result.getContent().stream().map(this::toListItemResponse).toList();
     }
 
     public ServiceObjectResponse get(UUID id) {
-        return toResponse(objects.findByIdAndActiveTrue(id).orElseThrow(() -> notFound(id)));
+        return toResponse(objects.findByIdAndActiveTrueAndLocationAssetOwnerUserId(id, currentUser.id())
+                .orElseThrow(() -> notFound(id)));
     }
 
     @Transactional
@@ -48,19 +52,21 @@ public class ServiceObjectService {
 
     @Transactional
     public ServiceObjectResponse update(UUID id, ServiceObjectRequest request) {
-        var object = objects.findForUpdateByIdAndActiveTrue(id).orElseThrow(() -> notFound(id));
+        var object = objects.findForUpdateByIdAndActiveTrueAndLocationAssetOwnerUserId(id, currentUser.id())
+                .orElseThrow(() -> notFound(id));
         applyRequest(object, request);
         return toResponse(object);
     }
 
     @Transactional
     public void delete(UUID id) {
-        var object = objects.findForUpdateByIdAndActiveTrue(id).orElseThrow(() -> notFound(id));
+        var object = objects.findForUpdateByIdAndActiveTrueAndLocationAssetOwnerUserId(id, currentUser.id())
+                .orElseThrow(() -> notFound(id));
         object.setActive(false);
     }
 
     private void applyRequest(ServiceObject object, ServiceObjectRequest request) {
-        var location = locations.findById(request.locationId()).orElseThrow(() ->
+        var location = locations.findByIdAndAssetOwnerUserId(request.locationId(), currentUser.id()).orElseThrow(() ->
                 new ResourceNotFoundException("Nie znaleziono lokalizacji: " + request.locationId()));
         object.setLocation(location);
         object.setName(request.name().strip());
@@ -70,6 +76,11 @@ public class ServiceObjectService {
         object.setModel(request.model());
         object.setSerialNumber(request.serialNumber());
         object.setAttributes(request.attributes());
+    }
+
+    private ServiceObjectListItemResponse toListItemResponse(ServiceObject object) {
+        return new ServiceObjectListItemResponse(object.getId(), object.getName(), object.getType(),
+                object.getLocation().getId(), object.getLocation().getName());
     }
 
     private ServiceObjectResponse toResponse(ServiceObject object) {

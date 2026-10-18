@@ -11,15 +11,18 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface ServiceObjectRepository extends JpaRepository<ServiceObject, UUID> {
-    @EntityGraph(attributePaths = "location")
-    Page<ServiceObject> findAllByActiveTrue(Pageable pageable);
+    boolean existsByLocationIdAndSerialNumber(UUID locationId, String serialNumber);
 
     @EntityGraph(attributePaths = "location")
-    Page<ServiceObject> findAllByActiveTrueAndLocationId(UUID locationId, Pageable pageable);
+    Page<ServiceObject> findAllByActiveTrueAndLocationAssetOwnerUserId(UUID userId, Pageable pageable);
 
     @EntityGraph(attributePaths = "location")
-    Optional<ServiceObject> findByIdAndActiveTrue(UUID id);
+    Page<ServiceObject> findAllByActiveTrueAndLocationIdAndLocationAssetOwnerUserId(
+            UUID locationId, UUID userId, Pageable pageable);
+
+    @EntityGraph(attributePaths = "location")
+    Optional<ServiceObject> findByIdAndActiveTrueAndLocationAssetOwnerUserId(UUID id, UUID userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    Optional<ServiceObject> findForUpdateByIdAndActiveTrue(UUID id);
+    Optional<ServiceObject> findForUpdateByIdAndActiveTrueAndLocationAssetOwnerUserId(UUID id, UUID userId);
 }

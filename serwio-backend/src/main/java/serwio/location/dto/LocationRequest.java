@@ -1,14 +1,11 @@
 package serwio.location.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import java.util.UUID;
 import serwio.validation.ValidTimeZone;
 
 public record LocationRequest(
-        @NotNull UUID assetOwnerId,
         @NotBlank @Size(max = 255) String name,
         @NotBlank @Size(max = 500) String addressLine,
         @NotBlank @Size(max = 150) String city,

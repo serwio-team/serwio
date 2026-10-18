@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.net.URI;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -16,7 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import serwio.location.dto.LocationPageResponse;
+import serwio.location.dto.LocationListItemResponse;
 import serwio.location.dto.LocationRequest;
 import serwio.location.dto.LocationResponse;
 import serwio.location.service.LocationService;
@@ -28,11 +29,10 @@ public class LocationController {
     private final LocationService service;
 
     @GetMapping
-    public LocationPageResponse list(
-            @RequestParam(required = false) UUID assetOwnerId,
+    public List<LocationListItemResponse> list(
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return service.list(assetOwnerId, page, size);
+        return service.list(page, size);
     }
 
     @GetMapping("/{id}")

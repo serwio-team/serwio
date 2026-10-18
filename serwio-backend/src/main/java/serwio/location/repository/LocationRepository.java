@@ -12,8 +12,10 @@ import java.util.Optional;
 public interface LocationRepository extends JpaRepository<Location, UUID> {
     Optional<Location> findFirstByAssetOwnerIdAndNameOrderByCreatedAtAscIdAsc(UUID assetOwnerId, String name);
 
-    Page<Location> findAllByAssetOwnerId(UUID assetOwnerId, Pageable pageable);
+    Page<Location> findAllByAssetOwnerUserId(UUID userId, Pageable pageable);
+
+    Optional<Location> findByIdAndAssetOwnerUserId(UUID id, UUID userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    Optional<Location> findForUpdateById(UUID id);
+    Optional<Location> findForUpdateByIdAndAssetOwnerUserId(UUID id, UUID userId);
 }

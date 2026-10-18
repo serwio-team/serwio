@@ -4,5 +4,5 @@
 # Szablon konfiguracji pozostaje widoczny dla Git.
 !.env.example
 
-# Pliki metadanych macOS.
-.DS_Store
+# Metadane macOS w każdym katalogu projektu.
+**/.DS_Store

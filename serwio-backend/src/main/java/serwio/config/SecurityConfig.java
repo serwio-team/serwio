@@ -8,8 +8,11 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import serwio.account.repository.UserAccountRepository;
+import serwio.security.AccountStatusFilter;
 import serwio.security.LoginHandlers;
 
 @Configuration(proxyBeanMethods = false)
@@ -20,8 +23,10 @@ public class SecurityConfig {
     }
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http, LoginHandlers loginHandlers) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, LoginHandlers loginHandlers,
+                                            UserAccountRepository accounts) throws Exception {
         return http
+                .addFilterBefore(new AccountStatusFilter(accounts), AuthorizationFilter.class)
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/csrf").permitAll()
                         .requestMatchers("/api/users/me", "/api/users/me/password").authenticated()

@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import serwio.technician.dto.TechnicianCreateRequest;
 import serwio.technician.dto.TechnicianPasswordRequest;
+import serwio.technician.dto.TechnicianProfileResponse;
 import serwio.technician.dto.TechnicianResponse;
 import serwio.technician.dto.TechnicianUpdateRequest;
 import serwio.technician.service.TechnicianService;
@@ -34,6 +35,11 @@ public class TechnicianController {
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         return service.list(branchId, page, size);
+    }
+
+    @GetMapping("/me")
+    public TechnicianProfileResponse current() {
+        return service.getCurrent();
     }
 
     @GetMapping("/{id}")

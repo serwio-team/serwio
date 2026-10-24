@@ -24,8 +24,9 @@ public class SecurityConfig {
         return http
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/csrf").permitAll()
-                        .requestMatchers("/api/users/me").authenticated()
+                        .requestMatchers("/api/users/me", "/api/users/me/password").authenticated()
                         .requestMatchers("/api/owners/me").hasRole("ASSET_OWNER")
+                        .requestMatchers("/api/technicians/me").hasRole("TECHNICIAN")
                         .requestMatchers("/api/companies/me", "/api/branches", "/api/branches/**",
                                 "/api/technicians", "/api/technicians/**").hasRole("SERVICE_COMPANY")
                         .requestMatchers("/api", "/api/locations", "/api/locations/**",

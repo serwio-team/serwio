@@ -23,6 +23,7 @@ import serwio.exception.ResourceNotFoundException;
 import serwio.security.CurrentUser;
 import serwio.technician.dto.TechnicianCreateRequest;
 import serwio.technician.dto.TechnicianPasswordRequest;
+import serwio.technician.dto.TechnicianProfileResponse;
 import serwio.technician.dto.TechnicianResponse;
 import serwio.technician.dto.TechnicianUpdateRequest;
 import serwio.technician.model.Technician;
@@ -49,6 +50,17 @@ public class TechnicianService {
                 ? technicians.findAllByBranchServiceCompanyUserId(userId, pageable)
                 : technicians.findAllByBranchIdAndBranchServiceCompanyUserId(branchId, userId, pageable);
         return result.getContent().stream().map(this::toResponse).toList();
+    }
+
+    public TechnicianProfileResponse getCurrent() {
+        var technician = technicians.findByUserId(currentUser.id())
+                .orElseThrow(() -> new ResourceNotFoundException("Konto nie ma profilu serwisanta"));
+        var branch = technician.getBranch();
+        var company = branch.getServiceCompany();
+        var user = technician.getUser();
+        return new TechnicianProfileResponse(technician.getId(), user.getId(), user.getEmail(),
+                technician.getDisplayName(), branch.getId(), branch.getName(), company.getId(), company.getName(),
+                technician.getCreatedAt());
     }
 
     public TechnicianResponse get(UUID id) {

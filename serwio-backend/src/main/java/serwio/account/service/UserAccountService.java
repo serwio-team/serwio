@@ -24,7 +24,7 @@ public class UserAccountService {
         var account = accounts.findById(currentUser.id())
                 .orElseThrow(() -> new ResourceNotFoundException("Nie znaleziono konta użytkownika"));
         return new UserAccountResponse(account.getId(), account.getEmail(), account.getRole(),
-                account.getStatus(), account.getCreatedAt());
+                account.getStatus(), account.getPasswordChangeRequired(), account.getCreatedAt());
     }
 
     @Transactional
@@ -35,5 +35,6 @@ public class UserAccountService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Aktualne hasło jest nieprawidłowe.");
         }
         account.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        account.setPasswordChangeRequired(false);
     }
 }

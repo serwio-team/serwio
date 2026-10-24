@@ -29,12 +29,13 @@ public class SecurityConfig {
                 .addFilterBefore(new AccountStatusFilter(accounts), AuthorizationFilter.class)
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/csrf").permitAll()
-                        .requestMatchers("/api/users/me", "/api/users/me/password").authenticated()
+                        .requestMatchers("/api", "/api/users/me", "/api/users/me/password").authenticated()
                         .requestMatchers("/api/owners/me").hasRole("ASSET_OWNER")
                         .requestMatchers("/api/technicians/me").hasRole("TECHNICIAN")
-                        .requestMatchers("/api/companies/me", "/api/branches", "/api/branches/**",
-                                "/api/technicians", "/api/technicians/**").hasRole("SERVICE_COMPANY")
-                        .requestMatchers("/api", "/api/locations", "/api/locations/**",
+                        .requestMatchers("/api/companies/me", "/api/companies/me/summary", "/api/branches",
+                                "/api/branches/**", "/api/technicians", "/api/technicians/**")
+                                .hasRole("SERVICE_COMPANY")
+                        .requestMatchers("/api/locations", "/api/locations/**",
                                 "/api/service-objects", "/api/service-objects/**").hasRole("ASSET_OWNER")
                         .anyRequest().authenticated())
                 .requestCache(cache -> cache.disable())

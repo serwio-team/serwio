@@ -82,6 +82,7 @@ public class TechnicianService {
         account.setPasswordHash(passwordEncoder.encode(request.password()));
         account.setRole("TECHNICIAN");
         account.setStatus("ACTIVE");
+        account.setPasswordChangeRequired(true);
         account.setCreatedAt(now);
         accounts.saveAndFlush(account);
 
@@ -125,6 +126,7 @@ public class TechnicianService {
         var technician = technicians.findForUpdateByIdAndBranchServiceCompanyUserId(id, currentUser.id())
                 .orElseThrow(() -> notFound(id));
         technician.getUser().setPasswordHash(passwordEncoder.encode(request.password()));
+        technician.getUser().setPasswordChangeRequired(true);
     }
 
     private ServiceCompany lockCompany() {
@@ -156,7 +158,14 @@ public class TechnicianService {
         var user = technician.getUser();
         return new TechnicianResponse(technician.getId(), user.getId(), user.getEmail(),
                 technician.getDisplayName(), branch.getId(), branch.getName(), technician.getActive(),
-                technician.getCreatedAt());
+                accountStatus(technician), technician.getCreatedAt());
+    }
+
+    private String accountStatus(Technician technician) {
+        if (!technician.getActive()) {
+            return "INACTIVE";
+        }
+        return technician.getUser().getPasswordChangeRequired() ? "PENDING" : "ACTIVE";
     }
 
     private OffsetDateTime now() {

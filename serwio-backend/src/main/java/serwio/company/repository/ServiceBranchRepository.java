@@ -25,4 +25,6 @@ public interface ServiceBranchRepository extends JpaRepository<ServiceBranch, UU
     boolean existsByServiceCompanyIdAndNameIgnoreCaseAndIdNot(UUID serviceCompanyId, String name, UUID id);
 
     long countByServiceCompanyIdAndActiveTrue(UUID serviceCompanyId);
+
+    long countByServiceCompanyIdAndActive(UUID serviceCompanyId, boolean active);
 }

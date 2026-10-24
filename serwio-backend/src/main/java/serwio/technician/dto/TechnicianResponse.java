@@ -11,5 +11,6 @@ public record TechnicianResponse(
         UUID branchId,
         String branchName,
         boolean active,
+        String accountStatus,
         OffsetDateTime createdAt
 ) {}

@@ -31,6 +31,10 @@ public interface TechnicianRepository extends JpaRepository<Technician, UUID> {
 
     long countByBranchIdAndActiveTrue(UUID branchId);
 
+    long countByBranchServiceCompanyIdAndActive(UUID serviceCompanyId, boolean active);
+
+    long countByBranchServiceCompanyIdAndActiveTrueAndUserPasswordChangeRequiredTrue(UUID serviceCompanyId);
+
     @Query("""
             select t.branch.id as branchId, count(t) as technicianCount
             from Technician t

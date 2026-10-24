@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import serwio.company.dto.CompanySummaryResponse;
 import serwio.company.dto.ServiceCompanyResponse;
 import serwio.company.service.ServiceCompanyService;
 
@@ -16,5 +17,10 @@ public class ServiceCompanyController {
     @GetMapping("/me")
     public ServiceCompanyResponse current() {
         return service.getCurrent();
+    }
+
+    @GetMapping("/me/summary")
+    public CompanySummaryResponse summary() {
+        return service.getSummary();
     }
 }

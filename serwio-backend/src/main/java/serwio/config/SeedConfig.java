@@ -179,6 +179,7 @@ public class SeedConfig {
     }
 
     private void createTechnician(UserAccount account, ServiceBranch branch, UserAccount changedBy) {
+        account.setPasswordChangeRequired(true);
         var technician = new Technician();
         technician.setUser(account);
         technician.setBranch(branch);

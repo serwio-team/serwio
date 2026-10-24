@@ -187,7 +187,6 @@ public class SeedConfig {
         technician.setCreatedAt(now());
         technicians.save(technician);
 
-        // Każdy serwisant ma od początku wpis przynależności, bo historia oddziałów jest źródłem dostępu do zleceń.
         var membership = new TechnicianBranchHistory();
         membership.setTechnician(technician);
         membership.setBranch(branch);

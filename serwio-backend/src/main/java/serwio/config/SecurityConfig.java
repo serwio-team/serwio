@@ -26,6 +26,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/csrf").permitAll()
                         .requestMatchers("/api/users/me").authenticated()
                         .requestMatchers("/api/owners/me").hasRole("ASSET_OWNER")
+                        .requestMatchers("/api/companies/me").hasRole("SERVICE_COMPANY")
                         .requestMatchers("/api", "/api/locations", "/api/locations/**",
                                 "/api/service-objects", "/api/service-objects/**").hasRole("ASSET_OWNER")
                         .anyRequest().authenticated())

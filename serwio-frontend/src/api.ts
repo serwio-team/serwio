@@ -6,9 +6,12 @@ import type {
   LocationListItemResponse,
   LocationRequest,
   LocationResponse,
+  PasswordChangeRequest,
+  ServiceCompanyResponse,
   ServiceObjectListItemResponse,
   ServiceObjectRequest,
   ServiceObjectResponse,
+  TechnicianProfileResponse,
   UserAccountResponse,
 } from './types';
 
@@ -63,7 +66,8 @@ async function toApiError(response: Response): Promise<ApiError> {
     csrfCache = null;
     window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
   }
-  const message = response.status === 400 && body?.detail ? body.detail : defaultMessage(response.status);
+  const message =
+    (response.status === 400 || response.status === 409) && body?.detail ? body.detail : defaultMessage(response.status);
   return new ApiError(response.status, message, body?.errors ?? {});
 }
 
@@ -121,6 +125,9 @@ async function getAllPages<T>(path: string): Promise<T[]> {
 export const api = {
   currentUser: () => get<UserAccountResponse>('/api/users/me'),
   currentOwner: () => get<AssetOwnerResponse>('/api/owners/me'),
+  currentCompany: () => get<ServiceCompanyResponse>('/api/companies/me'),
+  currentTechnician: () => get<TechnicianProfileResponse>('/api/technicians/me'),
+  changeOwnPassword: (data: PasswordChangeRequest) => mutate<void>('PUT', '/api/users/me/password', data),
 
   // Formularz logowania Spring Security z nagłówkiem Accept: application/json:
   // 200 = zalogowano, 401 z polem detail = złe dane. 401 bez detail lub 403 oznacza

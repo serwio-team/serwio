@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, ServerCrash, ShieldAlert } from 'lucide-react';
+import { Loader2, SearchX, ServerCrash, ShieldAlert } from 'lucide-react';
 import { useEffect, useRef, type ReactNode } from 'react';
-import { Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { ApiError, UNAUTHORIZED_EVENT, api, errorMessage } from './api';
 import { AppLayout } from './components/AppLayout';
 import { LocationsPage } from './pages/LocationsPage';
@@ -9,25 +9,30 @@ import { ServiceObjectsPage } from './pages/ServiceObjectsPage';
 import { SignInPage } from './pages/SignInPage';
 import { queryKeys, useCurrentUser } from './queries';
 
+const HOME_BY_ROLE: Record<string, string> = {
+  ASSET_OWNER: '/locations',
+  SERVICE_COMPANY: '/company',
+  TECHNICIAN: '/technician',
+};
+
 export function App() {
   return (
     <>
       <SessionWatcher />
       <Routes>
         <Route path="/sign-in" element={<SignInPage />} />
-        <Route element={<RequireOwner />}>
-          <Route index element={<Navigate to="/locations" replace />} />
+        <Route index element={<RequireRole />} />
+        <Route element={<RequireRole role="ASSET_OWNER" />}>
           <Route path="/locations" element={<LocationsPage />} />
           <Route path="/service-objects" element={<ServiceObjectsPage />} />
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </>
   );
 }
 
-// Strony panelu wymagają zalogowanego właściciela (rola ASSET_OWNER).
-function RequireOwner() {
+function RequireRole({ role }: { role?: string }) {
   const currentUser = useCurrentUser();
   const location = useLocation();
 
@@ -52,13 +57,17 @@ function RequireOwner() {
       </FullPageMessage>
     );
   }
-  if (currentUser.data.role !== 'ASSET_OWNER') {
+  const home = HOME_BY_ROLE[currentUser.data.role];
+  if (!home) {
     return (
       <FullPageMessage icon={<ShieldAlert size={20} />} title="Brak dostępu">
-        <p>Konto {currentUser.data.email} nie jest kontem właściciela obiektów.</p>
+        <p>Konto {currentUser.data.email} nie ma dostępu do panelu.</p>
         <LogoutButton />
       </FullPageMessage>
     );
+  }
+  if (currentUser.data.role !== role) {
+    return <Navigate to={home} replace />;
   }
   return (
     <AppLayout user={currentUser.data}>
@@ -67,8 +76,17 @@ function RequireOwner() {
   );
 }
 
+function NotFound() {
+  return (
+    <FullPageMessage icon={<SearchX size={20} />} title="Nie znaleziono strony">
+      <p>Ta strona nie istnieje.</p>
+      <Link to="/" className="btn btn-primary">Przejdź do panelu</Link>
+    </FullPageMessage>
+  );
+}
+
 // Po 401 w trakcie pracy (wygasła sesja) przenosi na logowanie i czyści dane poprzedniej sesji.
-// Przy pierwszym wejściu bez sesji przekierowuje RequireOwner, więc tu nic nie robimy.
+// Przy pierwszym wejściu bez sesji przekierowuje RequireRole, więc tu nic nie robimy.
 function SessionWatcher() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();

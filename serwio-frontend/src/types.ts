@@ -7,6 +7,7 @@ export interface UserAccountResponse {
   email: string;
   role: string;
   status: string;
+  passwordChangeRequired: boolean;
   createdAt: string;
 }
 
@@ -85,4 +86,28 @@ export interface ServiceObjectResponse {
   qrGeneratedAt: string | null;
   active: boolean;
   createdAt: string;
+}
+
+export interface ServiceCompanyResponse {
+  id: string;
+  userId: string;
+  name: string;
+  createdAt: string;
+}
+
+export interface TechnicianProfileResponse {
+  id: string;
+  userId: string;
+  email: string;
+  displayName: string;
+  branchId: string;
+  branchName: string;
+  companyId: string;
+  companyName: string;
+  createdAt: string;
+}
+
+export interface PasswordChangeRequest {
+  currentPassword: string;
+  newPassword: string;
 }

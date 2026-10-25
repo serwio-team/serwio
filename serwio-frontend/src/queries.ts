@@ -3,11 +3,13 @@
 
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, PAGE_SIZE, api } from './api';
-import type { LocationRequest, ServiceObjectRequest } from './types';
+import type { LocationRequest, PasswordChangeRequest, ServiceObjectRequest } from './types';
 
 export const queryKeys = {
   currentUser: ['users', 'me'] as const,
   currentOwner: ['owners', 'me'] as const,
+  currentCompany: ['companies', 'me'] as const,
+  currentTechnician: ['technicians', 'me'] as const,
   locations: ['locations'] as const,
   locationList: ['locations', 'list'] as const,
   allLocations: ['locations', 'all'] as const,
@@ -26,8 +28,24 @@ export function useCurrentUser() {
   return useQuery({ queryKey: queryKeys.currentUser, queryFn: api.currentUser });
 }
 
-export function useCurrentOwner() {
-  return useQuery({ queryKey: queryKeys.currentOwner, queryFn: api.currentOwner });
+export function useCurrentOwner(enabled = true) {
+  return useQuery({ queryKey: queryKeys.currentOwner, queryFn: api.currentOwner, enabled });
+}
+
+export function useCurrentCompany(enabled = true) {
+  return useQuery({ queryKey: queryKeys.currentCompany, queryFn: api.currentCompany, enabled });
+}
+
+export function useCurrentTechnician(enabled = true) {
+  return useQuery({ queryKey: queryKeys.currentTechnician, queryFn: api.currentTechnician, enabled });
+}
+
+export function useChangeOwnPassword() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: PasswordChangeRequest) => api.changeOwnPassword(data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.currentUser }),
+  });
 }
 
 export function useLocationList() {

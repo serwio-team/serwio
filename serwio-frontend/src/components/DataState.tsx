@@ -1,8 +1,6 @@
 import { AlertCircle, Loader2, RotateCw, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-// Stany listy: ładowanie, pusto, błąd i „Pokaż więcej”.
-
 export function TableSkeleton({ columns, rows = 5 }: { columns: number; rows?: number }) {
   return (
     <tbody aria-busy="true" aria-label="Ładowanie">

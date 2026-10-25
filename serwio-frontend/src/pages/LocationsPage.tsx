@@ -18,7 +18,6 @@ export function LocationsPage() {
   const list = useLocationList();
   const remove = useDeleteLocation();
   const toast = useToast();
-  // Formularz urządzenia może tu przekierować z prośbą o dodanie pierwszej lokalizacji.
   const [form, setForm] = useState<FormState>(
     (routerLocation.state as { create?: boolean } | null)?.create ? { mode: 'create' } : null,
   );

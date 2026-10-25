@@ -19,20 +19,17 @@ const EMPTY: LocationRequest = {
 };
 
 interface LocationFormModalProps {
-  // Brak id = dodawanie nowej lokalizacji.
   editId?: string;
   onClose: () => void;
 }
 
 export function LocationFormModal({ editId, onClose }: LocationFormModalProps) {
-  // Lista ma tylko podstawowe pola, więc do edycji pobieramy szczegóły po id.
   const details = useLocation(editId);
   const toast = useToast();
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const queryClient = useQueryClient();
 
-  // Lokalizacja zniknęła (404) — zamykamy formularz, lista odświeży się sama.
   const gone = details.error instanceof ApiError && details.error.status === 404;
   useEffect(() => {
     if (!gone) return;

@@ -7,6 +7,7 @@ import { AppLayout } from './components/AppLayout';
 import { LocationsPage } from './pages/LocationsPage';
 import { ServiceObjectsPage } from './pages/ServiceObjectsPage';
 import { SignInPage } from './pages/SignInPage';
+import { TechnicianDashboardPage } from './pages/TechnicianDashboardPage';
 import { queryKeys, useCurrentUser } from './queries';
 
 const HOME_BY_ROLE: Record<string, string> = {
@@ -26,6 +27,10 @@ export function App() {
           <Route path="/locations" element={<LocationsPage />} />
           <Route path="/service-objects" element={<ServiceObjectsPage />} />
         </Route>
+        <Route element={<RequireRole role="TECHNICIAN" />}>
+          <Route path="/technician" element={<TechnicianDashboardPage />} />
+        </Route>
+        <Route path="/company" element={<CompanyEntry />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>
@@ -74,6 +79,16 @@ function RequireRole({ role }: { role?: string }) {
       <Outlet />
     </AppLayout>
   );
+}
+
+function CompanyEntry() {
+  const currentUser = useCurrentUser();
+
+  if (currentUser.data?.role === 'TECHNICIAN') {
+    return <Navigate to="/technician" replace />;
+  }
+
+  return <NotFound />;
 }
 
 function NotFound() {

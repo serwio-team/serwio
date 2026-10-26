@@ -11,7 +11,6 @@ import './styles.css';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Błędów 4xx (401, 403, 404…) nie ponawiamy — ponowienie nic nie zmieni.
       retry: (failureCount, error) =>
         !(error instanceof ApiError && error.status < 500) && failureCount < 2,
     },

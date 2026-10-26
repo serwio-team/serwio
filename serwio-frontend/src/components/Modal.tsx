@@ -45,12 +45,21 @@ interface ConfirmDialogProps {
   title: string;
   message: ReactNode;
   confirmLabel: string;
+  pendingLabel?: string;
   pending: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-export function ConfirmDialog({ title, message, confirmLabel, pending, onConfirm, onCancel }: ConfirmDialogProps) {
+export function ConfirmDialog({
+  title,
+  message,
+  confirmLabel,
+  pendingLabel = 'Usuwanie…',
+  pending,
+  onConfirm,
+  onCancel,
+}: ConfirmDialogProps) {
   return (
     <Modal title={title} onClose={() => !pending && onCancel()}>
       <div className="modal-body confirm-body">
@@ -61,7 +70,7 @@ export function ConfirmDialog({ title, message, confirmLabel, pending, onConfirm
         <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={pending}>Anuluj</button>
         <button type="button" className="btn btn-danger" onClick={onConfirm} disabled={pending} autoFocus>
           {pending && <Loader2 size={14} className="spin" aria-hidden />}
-          {pending ? 'Usuwanie…' : confirmLabel}
+          {pending ? pendingLabel : confirmLabel}
         </button>
       </footer>
     </Modal>

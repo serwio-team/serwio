@@ -38,7 +38,6 @@ interface ServiceObjectFormModalProps {
 
 export function ServiceObjectFormModal({ editId, defaultLocationId, onClose, onAddLocation }: ServiceObjectFormModalProps) {
   const locations = useAllLocations();
-  // Lista ma tylko podstawowe pola, więc do edycji pobieramy szczegóły po id.
   const details = useServiceObject(editId);
   const toast = useToast();
   const onCloseRef = useRef(onClose);
@@ -98,7 +97,6 @@ export function ServiceObjectFormModal({ editId, defaultLocationId, onClose, onA
           serialNumber: d?.serialNumber ?? '',
           description: d?.description ?? '',
         }}
-        // PUT nadpisuje wszystkie pola, więc atrybuty (niewidoczne w formularzu) odsyłamy bez zmian.
         attributes={d?.attributes ?? null}
         onClose={onClose}
       />

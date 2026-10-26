@@ -14,7 +14,6 @@ type FormState = { mode: 'create' } | { mode: 'edit'; id: string } | null;
 
 export function ServiceObjectsPage() {
   const navigate = useNavigate();
-  // Filtr trzymamy w adresie (?locationId=…), więc przetrwa odświeżenie strony.
   const [searchParams, setSearchParams] = useSearchParams();
   const locationId = searchParams.get('locationId') ?? undefined;
   const locations = useAllLocations();
@@ -24,7 +23,6 @@ export function ServiceObjectsPage() {
   const [form, setForm] = useState<FormState>(null);
   const [toDelete, setToDelete] = useState<ServiceObjectListItemResponse | null>(null);
 
-  // Filtr wskazuje lokalizację, której już nie ma — wracamy do „Wszystkie”.
   useEffect(() => {
     if (locationId && locations.data && !locations.data.some((l) => l.id === locationId)) {
       setSearchParams({}, { replace: true });

@@ -28,7 +28,6 @@ export function SignInPage() {
 
   const target = state.from && state.from !== '/sign-in' ? state.from : '/';
 
-  // Ktoś już zalogowany nie musi widzieć formularza.
   if (currentUser.isSuccess) return <Navigate to={target} replace />;
 
   async function submit(event: FormEvent) {
@@ -37,7 +36,6 @@ export function SignInPage() {
     setError(null);
     try {
       await api.login(email.trim(), password);
-      // Nowa sesja — dane z poprzedniej nie mogą zostać w pamięci.
       queryClient.clear();
       navigate(target, { replace: true });
     } catch (e) {

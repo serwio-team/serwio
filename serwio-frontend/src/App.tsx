@@ -10,6 +10,7 @@ import { CompanyDashboardPage } from './pages/CompanyDashboardPage';
 import { LocationsPage } from './pages/LocationsPage';
 import { ServiceObjectsPage } from './pages/ServiceObjectsPage';
 import { SignInPage } from './pages/SignInPage';
+import { TechnicianDashboardPage } from './pages/TechnicianDashboardPage';
 import { TechniciansPage } from './pages/TechniciansPage';
 import { queryKeys, useCurrentUser } from './queries';
 
@@ -29,6 +30,9 @@ export function App() {
         <Route element={<RequireRole role="ASSET_OWNER" />}>
           <Route path="/locations" element={<LocationsPage />} />
           <Route path="/service-objects" element={<ServiceObjectsPage />} />
+        </Route>
+        <Route element={<RequireRole role="TECHNICIAN" />}>
+          <Route path="/technician" element={<TechnicianDashboardPage />} />
         </Route>
         <Route element={<RequireRole role="SERVICE_COMPANY" />}>
           <Route path="/company" element={<CompanyDashboardPage />} />
@@ -95,6 +99,8 @@ function NotFound() {
   );
 }
 
+// Po 401 w trakcie pracy (wygasła sesja) przenosi na logowanie i czyści dane poprzedniej sesji.
+// Przy pierwszym wejściu bez sesji przekierowuje RequireRole, więc tu nic nie robimy.
 function SessionWatcher() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();

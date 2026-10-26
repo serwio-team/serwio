@@ -407,6 +407,30 @@ tr:hover .row-actions, .row-actions:focus-within { opacity: 1; }
   .modal-footer .btn { flex: 1; }
 }
 
+.technician-dashboard { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.technician-profile { display: grid; gap: 20px; min-width: 0; }
+.technician-card { padding: 20px; min-width: 0; }
+.technician-card h2 { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; }
+.technician-card h2 svg { color: var(--text-2); flex: none; }
+.technician-card-description { margin: 6px 0 20px; font-size: 13px; }
+.technician-details { display: grid; gap: 16px; margin: 20px 0 0; }
+.technician-details dt { margin-bottom: 3px; color: var(--text-2); font-size: 12px; }
+.technician-details dd { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
+.technician-loading { display: flex; align-items: center; gap: 8px; padding-top: 20px; color: var(--text-2); }
+.technician-password-notice { flex-wrap: wrap; align-items: center; }
+.technician-password-notice > svg { flex: none; }
+.technician-password-notice > div { flex: 1; min-width: 180px; }
+.technician-password-notice a { text-decoration: none; }
+.technician-card .error-state { margin: 20px 0 0; }
+.technician-card .error-state span { min-width: 0; overflow-wrap: anywhere; }
+
+@media (max-width: 600px) {
+  .technician-dashboard { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .technician-profile { gap: 16px; }
+  .technician-card { padding: 16px; }
+  .technician-password-notice .btn { margin-left: 26px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }

@@ -1,21 +1,62 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Box, ChevronDown, Loader2, LogOut, MapPin, Menu, X } from 'lucide-react';
+import {
+  Box,
+  Building2,
+  ChevronDown,
+  LayoutDashboard,
+  Loader2,
+  LogOut,
+  MapPin,
+  Menu,
+  Users,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import { useCurrentOwner } from '../queries';
+import { useCurrentCompany, useCurrentOwner, useCurrentTechnician } from '../queries';
 import type { UserAccountResponse } from '../types';
 
-const NAV_ITEMS = [
-  { to: '/locations', label: 'Lokalizacje', icon: MapPin },
-  { to: '/service-objects', label: 'Urządzenia', icon: Box },
-];
+interface NavItem {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+}
+
+const NAV_BY_ROLE: Record<string, { section: string; items: NavItem[] }> = {
+  ASSET_OWNER: {
+    section: 'Moje obiekty',
+    items: [
+      { to: '/locations', label: 'Lokalizacje', icon: MapPin },
+      { to: '/service-objects', label: 'Urządzenia', icon: Box },
+    ],
+  },
+  SERVICE_COMPANY: {
+    section: 'Firma serwisowa',
+    items: [
+      { to: '/company', label: 'Pulpit', icon: LayoutDashboard },
+      { to: '/company/branches', label: 'Oddziały', icon: Building2 },
+      { to: '/company/technicians', label: 'Serwisanci', icon: Users },
+    ],
+  },
+  TECHNICIAN: {
+    section: 'Serwisant',
+    items: [{ to: '/technician', label: 'Mój panel', icon: LayoutDashboard }],
+  },
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  ASSET_OWNER: 'Właściciel obiektów',
+  SERVICE_COMPANY: 'Firma serwisowa',
+  TECHNICIAN: 'Serwisant',
+};
 
 export function AppLayout({ user, children }: { user: UserAccountResponse; children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
+  const nav = NAV_BY_ROLE[user.role];
 
-  // Na telefonie menu boczne zamyka się po przejściu do innej strony.
   useEffect(() => setMenuOpen(false), [location.pathname]);
 
   return (
@@ -29,9 +70,14 @@ export function AppLayout({ user, children }: { user: UserAccountResponse; child
           </button>
         </div>
         <nav className="sidebar-nav">
-          <span className="sidebar-section">Moje obiekty</span>
-          {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
-            <NavLink key={to} to={to} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
+          <span className="sidebar-section">{nav?.section}</span>
+          {nav?.items.map(({ to, label, icon: Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/company'}
+              className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+            >
               <Icon size={16} aria-hidden />
               {label}
             </NavLink>
@@ -55,7 +101,9 @@ export function AppLayout({ user, children }: { user: UserAccountResponse; child
 }
 
 function AccountMenu({ user }: { user: UserAccountResponse }) {
-  const owner = useCurrentOwner();
+  const owner = useCurrentOwner(user.role === 'ASSET_OWNER');
+  const company = useCurrentCompany(user.role === 'SERVICE_COMPANY');
+  const technician = useCurrentTechnician(user.role === 'TECHNICIAN');
   const [open, setOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -86,7 +134,8 @@ function AccountMenu({ user }: { user: UserAccountResponse }) {
     }
   }
 
-  const displayName = owner.data?.name ?? user.email;
+  const profileName = owner.data?.name ?? company.data?.name ?? technician.data?.displayName;
+  const displayName = profileName ?? user.email;
 
   return (
     <div className="account" ref={ref}>
@@ -100,7 +149,7 @@ function AccountMenu({ user }: { user: UserAccountResponse }) {
         <span className="avatar" aria-hidden>{displayName.charAt(0).toUpperCase()}</span>
         <span className="account-text">
           <span className="account-name">{displayName}</span>
-          {owner.data && <span className="account-email">{user.email}</span>}
+          {profileName && <span className="account-email">{user.email}</span>}
         </span>
         <ChevronDown size={14} aria-hidden className="account-chevron" />
       </button>
@@ -109,7 +158,7 @@ function AccountMenu({ user }: { user: UserAccountResponse }) {
           <div className="account-menu-header">
             <span className="account-name">{displayName}</span>
             <span className="account-email">{user.email}</span>
-            <span className="badge">Właściciel obiektów</span>
+            <span className="badge">{ROLE_LABELS[user.role] ?? user.role}</span>
           </div>
           <button type="button" role="menuitem" className="menu-item" onClick={logout} disabled={loggingOut}>
             {loggingOut ? <Loader2 size={16} className="spin" aria-hidden /> : <LogOut size={16} aria-hidden />}

@@ -17,10 +17,18 @@ import serwio.account.model.UserAccount;
 import serwio.account.repository.UserAccountRepository;
 import serwio.asset.model.ServiceObject;
 import serwio.asset.repository.ServiceObjectRepository;
+import serwio.company.model.ServiceBranch;
+import serwio.company.model.ServiceCompany;
+import serwio.company.repository.ServiceBranchRepository;
+import serwio.company.repository.ServiceCompanyRepository;
 import serwio.location.model.Location;
 import serwio.location.repository.LocationRepository;
 import serwio.owner.model.AssetOwner;
 import serwio.owner.repository.AssetOwnerRepository;
+import serwio.technician.model.Technician;
+import serwio.technician.model.TechnicianBranchHistory;
+import serwio.technician.repository.TechnicianBranchHistoryRepository;
+import serwio.technician.repository.TechnicianRepository;
 
 @Slf4j
 @Configuration(proxyBeanMethods = false)
@@ -29,11 +37,18 @@ import serwio.owner.repository.AssetOwnerRepository;
 public class SeedConfig {
     private static final String DEMO_EMAIL = "owner@example.com";
     private static final String DEMO_LOCATION_NAME = "Lokalizacja testowa";
+    private static final String DEMO_COMPANY_EMAIL = "company@example.com";
+    private static final String DEMO_TECHNICIAN_EMAIL = "technician@example.com";
+    private static final String DEMO_BRANCH_NAME = "Oddział główny";
 
     private final UserAccountRepository accounts;
     private final AssetOwnerRepository owners;
     private final LocationRepository locations;
     private final ServiceObjectRepository objects;
+    private final ServiceCompanyRepository companies;
+    private final ServiceBranchRepository branches;
+    private final TechnicianRepository technicians;
+    private final TechnicianBranchHistoryRepository branchHistory;
     private final PasswordEncoder passwordEncoder;
 
     @Value("${app.demo.seed.password:}")
@@ -42,14 +57,9 @@ public class SeedConfig {
     @Bean
     CommandLineRunner seedDemoLocation(PlatformTransactionManager transactionManager) {
         return args -> {
-            var locationId = new TransactionTemplate(transactionManager).execute(status -> {
-                var account = accounts.findByEmail(DEMO_EMAIL).orElseGet(this::createAccount);
-                if (!"ASSET_OWNER".equals(account.getRole())) {
-                    throw new IllegalStateException("Konto " + DEMO_EMAIL + " nie ma roli ASSET_OWNER");
-                }
-                if ("!seed-account-without-login".equals(account.getPasswordHash())) {
-                    initializeCredentials(account);
-                }
+            var transactions = new TransactionTemplate(transactionManager);
+            var locationId = transactions.execute(status -> {
+                var account = prepareAccount(DEMO_EMAIL, "ASSET_OWNER");
                 var owner = owners.findByUserId(account.getId()).orElseGet(() -> createOwner(account));
                 var location = locations.findFirstByAssetOwnerIdAndNameOrderByCreatedAtAscIdAsc(
                                 owner.getId(), DEMO_LOCATION_NAME)
@@ -60,13 +70,27 @@ public class SeedConfig {
                 return location.getId();
             });
             log.info("Dane startowe gotowe. Lokalizacja testowa — locationId: {}", locationId);
+            var branchId = transactions.execute(status -> seedCompany());
+            log.info("Dane startowe firmy gotowe. Konta {} i {}, oddział testowy — branchId: {}",
+                    DEMO_COMPANY_EMAIL, DEMO_TECHNICIAN_EMAIL, branchId);
         };
     }
 
-    private UserAccount createAccount() {
+    private UserAccount prepareAccount(String email, String role) {
+        var account = accounts.findByEmail(email).orElseGet(() -> createAccount(email, role));
+        if (!role.equals(account.getRole())) {
+            throw new IllegalStateException("Konto " + email + " nie ma roli " + role);
+        }
+        if ("!seed-account-without-login".equals(account.getPasswordHash())) {
+            initializeCredentials(account);
+        }
+        return account;
+    }
+
+    private UserAccount createAccount(String email, String role) {
         var account = new UserAccount();
-        account.setEmail(DEMO_EMAIL);
-        account.setRole("ASSET_OWNER");
+        account.setEmail(email);
+        account.setRole(role);
         initializeCredentials(account);
         account.setCreatedAt(now());
         return accounts.save(account);
@@ -77,7 +101,7 @@ public class SeedConfig {
         account.setPasswordHash(passwordEncoder.encode(password));
         account.setStatus("ACTIVE");
         if (seedPassword.isBlank()) {
-            log.warn("Wygenerowane hasło konta testowego {}: {}", DEMO_EMAIL, password);
+            log.warn("Wygenerowane hasło konta testowego {}: {}", account.getEmail(), password);
         }
     }
 
@@ -121,5 +145,54 @@ public class SeedConfig {
         object.setActive(true);
         object.setCreatedAt(now());
         objects.save(object);
+    }
+
+    private UUID seedCompany() {
+        var companyAccount = prepareAccount(DEMO_COMPANY_EMAIL, "SERVICE_COMPANY");
+        var company = companies.findByUserId(companyAccount.getId())
+                .orElseGet(() -> createCompany(companyAccount));
+        var branch = branches.findFirstByServiceCompanyIdAndNameOrderByCreatedAtAscIdAsc(
+                        company.getId(), DEMO_BRANCH_NAME)
+                .orElseGet(() -> createBranch(company));
+        var technicianAccount = prepareAccount(DEMO_TECHNICIAN_EMAIL, "TECHNICIAN");
+        if (technicians.findByUserId(technicianAccount.getId()).isEmpty()) {
+            createTechnician(technicianAccount, branch, companyAccount);
+        }
+        return branch.getId();
+    }
+
+    private ServiceCompany createCompany(UserAccount account) {
+        var company = new ServiceCompany();
+        company.setUser(account);
+        company.setName("Firma serwisowa testowa");
+        company.setCreatedAt(now());
+        return companies.save(company);
+    }
+
+    private ServiceBranch createBranch(ServiceCompany company) {
+        var branch = new ServiceBranch();
+        branch.setServiceCompany(company);
+        branch.setName(DEMO_BRANCH_NAME);
+        branch.setActive(true);
+        branch.setCreatedAt(now());
+        return branches.save(branch);
+    }
+
+    private void createTechnician(UserAccount account, ServiceBranch branch, UserAccount changedBy) {
+        account.setPasswordChangeRequired(true);
+        var technician = new Technician();
+        technician.setUser(account);
+        technician.setBranch(branch);
+        technician.setDisplayName("Serwisant testowy");
+        technician.setActive(true);
+        technician.setCreatedAt(now());
+        technicians.save(technician);
+
+        var membership = new TechnicianBranchHistory();
+        membership.setTechnician(technician);
+        membership.setBranch(branch);
+        membership.setChangedByUser(changedBy);
+        membership.setValidFrom(technician.getCreatedAt());
+        branchHistory.save(membership);
     }
 }

@@ -53,4 +53,9 @@ public class UserAccount {
     @Column(name = "created_at", nullable = false, unique = false, columnDefinition = "timestamp with time zone")
     @NotNull
     private OffsetDateTime createdAt;
+
+    @Column(name = "password_change_required", nullable = false, unique = false,
+            columnDefinition = "boolean default false")
+    @NotNull
+    private Boolean passwordChangeRequired = false;
 }

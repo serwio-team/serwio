@@ -23,6 +23,11 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
     }
 
+    @ExceptionHandler(ConflictException.class)
+    ProblemDetail handleBusinessConflict(ConflictException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     ProblemDetail handleConflict(DataIntegrityViolationException exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,

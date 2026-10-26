@@ -6,6 +6,7 @@ erDiagram
         varchar role
         varchar status
         timestamptz created_at
+        boolean password_change_required
     }
     ASSET_OWNER {
         uuid id PK

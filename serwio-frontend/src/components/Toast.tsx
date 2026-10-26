@@ -11,7 +11,6 @@ interface ToastItem {
 
 const ToastContext = createContext<(kind: ToastKind, message: string) => void>(() => {});
 
-// Krótkie komunikaty po zapisie i usunięciu, znikają same po kilku sekundach.
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const nextId = useRef(0);

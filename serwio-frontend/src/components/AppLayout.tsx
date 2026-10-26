@@ -57,7 +57,6 @@ export function AppLayout({ user, children }: { user: UserAccountResponse; child
   const location = useLocation();
   const nav = NAV_BY_ROLE[user.role];
 
-  // Na telefonie menu boczne zamyka się po przejściu do innej strony.
   useEffect(() => setMenuOpen(false), [location.pathname]);
 
   return (

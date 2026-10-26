@@ -1,17 +1,21 @@
-// Klient API. Wszystkie adresy są względne (/api/...), lokalnie przechodzą przez proxy Vite.
-// Cookie JSESSIONID przeglądarka wysyła sama — nie odczytujemy go w JS.
-
 import type {
   AssetOwnerResponse,
+  CompanySummaryResponse,
   LocationListItemResponse,
   LocationRequest,
   LocationResponse,
   PasswordChangeRequest,
+  ServiceBranchRequest,
+  ServiceBranchResponse,
   ServiceCompanyResponse,
   ServiceObjectListItemResponse,
   ServiceObjectRequest,
   ServiceObjectResponse,
+  TechnicianCreateRequest,
+  TechnicianPasswordRequest,
   TechnicianProfileResponse,
+  TechnicianResponse,
+  TechnicianUpdateRequest,
   UserAccountResponse,
 } from './types';
 
@@ -28,7 +32,6 @@ export class ApiError extends Error {
   }
 }
 
-// SessionWatcher nasłuchuje tego zdarzenia i po 401 przenosi na stronę logowania.
 export const UNAUTHORIZED_EVENT = 'serwio:unauthorized';
 
 interface CsrfToken {
@@ -57,7 +60,6 @@ function defaultMessage(status: number): string {
   }
 }
 
-// Odpowiedź błędu może nie zawierać JSON-a, więc parsujemy ostrożnie.
 async function toApiError(response: Response): Promise<ApiError> {
   const body = (await response.json().catch(() => null)) as
     | { detail?: string; errors?: Record<string, string[]> }
@@ -72,7 +74,6 @@ async function toApiError(response: Response): Promise<ApiError> {
 }
 
 async function readBody<T>(response: Response): Promise<T> {
-  // 204 nie ma treści — nie wywołujemy response.json().
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
@@ -93,8 +94,6 @@ async function send(method: string, url: string, body: unknown, csrf: CsrfToken)
   });
 }
 
-// POST/PUT/DELETE z tokenem CSRF. Po 403 sprawdzamy sesję przez GET /api:
-// 401 → trzeba się zalogować, 200 → pobieramy świeży CSRF i ponawiamy raz.
 async function mutate<T>(method: string, url: string, body?: unknown): Promise<T> {
   let response = await send(method, url, body, csrfCache ?? (await fetchCsrf()));
   if (response.status === 403) {
@@ -112,7 +111,6 @@ function pageQuery(page: number, size: number, extra: Record<string, string | un
   return params.toString();
 }
 
-// Pobiera wszystkie strony (np. do listy wyboru). Krótsza strona oznacza koniec.
 async function getAllPages<T>(path: string): Promise<T[]> {
   const all: T[] = [];
   for (let page = 0; ; page++) {
@@ -129,9 +127,6 @@ export const api = {
   currentTechnician: () => get<TechnicianProfileResponse>('/api/technicians/me'),
   changeOwnPassword: (data: PasswordChangeRequest) => mutate<void>('PUT', '/api/users/me/password', data),
 
-  // Formularz logowania Spring Security z nagłówkiem Accept: application/json:
-  // 200 = zalogowano, 401 z polem detail = złe dane. 401 bez detail lub 403 oznacza
-  // nieaktualny token CSRF — wtedy pobieramy nowy i próbujemy jeszcze raz.
   async login(username: string, password: string): Promise<void> {
     for (let attempt = 0; attempt < 2; attempt++) {
       const csrf = attempt === 0 && csrfCache ? csrfCache : await fetchCsrf();
@@ -141,7 +136,6 @@ export const api = {
         body: new URLSearchParams({ username, password, [csrf.parameterName]: csrf.token }),
       });
       if (response.ok) {
-        // Po zalogowaniu sesja i token CSRF są nowe.
         csrfCache = null;
         return;
       }
@@ -154,7 +148,6 @@ export const api = {
     throw new ApiError(403, 'Nie udało się zalogować. Odśwież stronę i spróbuj ponownie.');
   },
 
-  // Spring odpowiada przekierowaniem na /login?logout — nie potrzebujemy tej strony.
   async logout(): Promise<void> {
     const csrf = csrfCache ?? (await fetchCsrf());
     await fetch('/logout', { method: 'POST', headers: { [csrf.headerName]: csrf.token } });
@@ -177,7 +170,30 @@ export const api = {
   updateServiceObject: (id: string, data: ServiceObjectRequest) =>
     mutate<ServiceObjectResponse>('PUT', `/api/service-objects/${encodeURIComponent(id)}`, data),
   deleteServiceObject: (id: string) => mutate<void>('DELETE', `/api/service-objects/${encodeURIComponent(id)}`),
+
+  companySummary: () => get<CompanySummaryResponse>('/api/companies/me/summary'),
+
+  listBranches: (page: number) => get<ServiceBranchResponse[]>(`/api/branches?${pageQuery(page, PAGE_SIZE)}`),
+  allBranches: () => getAllPages<ServiceBranchResponse>('/api/branches'),
+  getBranch: (id: string) => get<ServiceBranchResponse>(`/api/branches/${encodeURIComponent(id)}`),
+  createBranch: (data: ServiceBranchRequest) => mutate<ServiceBranchResponse>('POST', '/api/branches', data),
+  updateBranch: (id: string, data: ServiceBranchRequest) =>
+    mutate<ServiceBranchResponse>('PUT', `/api/branches/${encodeURIComponent(id)}`, data),
+  deactivateBranch: (id: string) => mutate<void>('DELETE', `/api/branches/${encodeURIComponent(id)}`),
+
+  listTechnicians: (page: number, branchId?: string) =>
+    get<TechnicianResponse[]>(`/api/technicians?${pageQuery(page, PAGE_SIZE, { branchId })}`),
+  getTechnician: (id: string) => get<TechnicianResponse>(`/api/technicians/${encodeURIComponent(id)}`),
+  createTechnician: (data: TechnicianCreateRequest) => mutate<TechnicianResponse>('POST', '/api/technicians', data),
+  updateTechnician: (id: string, data: TechnicianUpdateRequest) =>
+    mutate<TechnicianResponse>('PUT', `/api/technicians/${encodeURIComponent(id)}`, data),
+  setTechnicianPassword: (id: string, data: TechnicianPasswordRequest) =>
+    mutate<void>('PUT', `/api/technicians/${encodeURIComponent(id)}/password`, data),
 };
+
+export function hasFieldErrors(error: unknown): boolean {
+  return error instanceof ApiError && Object.keys(error.fieldErrors).length > 0;
+}
 
 export function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;

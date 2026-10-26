@@ -1,8 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// Lokalnie: zapytania /api, /login i /logout idą przez proxy do backendu na porcie 8080.
-// Dzięki temu frontend i backend mają ten sam adres, a cookie JSESSIONID działa bez CORS.
 export default defineConfig({
   plugins: [react()],
   server: {

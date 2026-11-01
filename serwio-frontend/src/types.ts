@@ -21,6 +21,25 @@ export interface LocationListItemResponse {
   city: string;
 }
 
+export interface AvailabilityInterval {
+  from: string;
+  to: string;
+}
+
+export interface AvailabilityDay {
+  dayOfWeek: number;
+  intervals: AvailabilityInterval[];
+}
+
+export interface AvailabilityRequest {
+  days: AvailabilityDay[];
+}
+
+export interface AvailabilityResponse extends AvailabilityRequest {
+  locationId: string;
+  timezone: string;
+}
+
 export interface LocationRequest {
   name: string;
   addressLine: string;

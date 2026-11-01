@@ -1,15 +1,41 @@
 import { AlertTriangle, Loader2, X } from 'lucide-react';
-import { useEffect, useId, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 
 interface ModalProps {
   title: string;
   description?: string;
   onClose: () => void;
   children: ReactNode;
+  trapFocus?: boolean;
 }
 
-export function Modal({ title, description, onClose, children }: ModalProps) {
+export function Modal({ title, description, onClose, children, trapFocus = false }: ModalProps) {
   const titleId = useId();
+  const dialog = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!trapFocus) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const element = dialog.current!;
+    element.focus();
+    const keepFocus = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const controls = Array.from(element.querySelectorAll<HTMLElement>('button, input, select, textarea, [tabindex="0"]'))
+        .filter((control) => !control.matches(':disabled') && control.getClientRects().length > 0);
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === element)) {
+        event.preventDefault(); last?.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === element)) {
+        event.preventDefault(); first?.focus();
+      }
+    };
+    element.addEventListener('keydown', keepFocus);
+    return () => {
+      element.removeEventListener('keydown', keepFocus);
+      previous?.focus();
+    };
+  }, [trapFocus]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -25,7 +51,7 @@ export function Modal({ title, description, onClose, children }: ModalProps) {
 
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={dialog} tabIndex={trapFocus ? -1 : undefined}>
         <header className="modal-header">
           <div>
             <h2 id={titleId}>{title}</h2>

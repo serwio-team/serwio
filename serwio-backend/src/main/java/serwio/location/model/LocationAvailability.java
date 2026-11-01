@@ -13,14 +13,12 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import serwio.validation.ValidPeriod;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import java.time.LocalTime;
 import java.util.UUID;
 
-@ValidPeriod(start = "availableFrom", end = "availableTo", allowOpenEnd = false)
 @Entity
 @Table(name = "location_availability")
 @Getter
@@ -51,4 +49,14 @@ public class LocationAvailability {
     @Column(name = "available_to", nullable = false, unique = false, columnDefinition = "time")
     @NotNull
     private LocalTime availableTo;
+
+    @Column(name = "ends_at_midnight", nullable = false, columnDefinition = "boolean default false")
+    private boolean endsAtMidnight;
+
+    @jakarta.validation.constraints.AssertTrue(message = "Nieprawidłowy przedział dostępności")
+    @jakarta.persistence.Transient
+    public boolean isIntervalValid() {
+        if (availableFrom == null || availableTo == null) return true;
+        return endsAtMidnight ? availableTo.equals(LocalTime.MIDNIGHT) : availableFrom.isBefore(availableTo);
+    }
 }

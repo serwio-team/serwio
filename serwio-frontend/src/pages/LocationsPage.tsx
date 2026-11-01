@@ -4,6 +4,7 @@ import { useLocation as useRouterLocation, useNavigate } from 'react-router-dom'
 import { ApiError, errorMessage } from '../api';
 import { EmptyState, ErrorState, LoadMore, PageHeader, TableSkeleton } from '../components/DataState';
 import { LocationFormModal } from '../components/LocationForm';
+import { AvailabilityModal } from '../components/AvailabilityForm';
 import { ConfirmDialog } from '../components/Modal';
 import { RowActions } from '../components/RowActions';
 import { useToast } from '../components/Toast';
@@ -22,6 +23,7 @@ export function LocationsPage() {
     (routerLocation.state as { create?: boolean } | null)?.create ? { mode: 'create' } : null,
   );
   const [toDelete, setToDelete] = useState<LocationListItemResponse | null>(null);
+  const [availability, setAvailability] = useState<LocationListItemResponse | null>(null);
 
   useEffect(() => {
     if (routerLocation.state) navigate(routerLocation.pathname, { replace: true, state: null });
@@ -95,6 +97,8 @@ export function LocationsPage() {
                       <td className="muted col-wide">{l.addressLine}</td>
                       <td className="muted col-wide">{l.city}</td>
                       <td className="col-actions">
+                        <button type="button" className="btn btn-secondary btn-sm"
+                          aria-label={`Dostępność: ${l.name}`} onClick={() => setAvailability(l)}>Dostępność</button>
                         <RowActions
                           name={l.name}
                           onEdit={() => setForm({ mode: 'edit', id: l.id })}
@@ -118,6 +122,7 @@ export function LocationsPage() {
       {form && (
         <LocationFormModal editId={form.mode === 'edit' ? form.id : undefined} onClose={() => setForm(null)} />
       )}
+      {availability && <AvailabilityModal key={availability.id} location={availability} onClose={() => setAvailability(null)} />}
       {toDelete && (
         <ConfirmDialog
           title="Usunąć lokalizację?"

@@ -1,5 +1,6 @@
 import type {
   AssetOwnerResponse,
+  OwnerRegistrationRequest,
   CompanySummaryResponse,
   LocationListItemResponse,
   LocationRequest,
@@ -94,9 +95,11 @@ async function send(method: string, url: string, body: unknown, csrf: CsrfToken)
   });
 }
 
-async function mutate<T>(method: string, url: string, body?: unknown): Promise<T> {
+async function mutate<T>(method: string, url: string, body?: unknown, anonymous = false): Promise<T> {
   let response = await send(method, url, body, csrfCache ?? (await fetchCsrf()));
-  if (response.status === 403) {
+  if (anonymous && (response.status === 401 || response.status === 403)) {
+    response = await send(method, url, body, await fetchCsrf());
+  } else if (response.status === 403) {
     const session = await fetch('/api', { headers: { Accept: 'application/json' } });
     if (session.status === 401) throw await toApiError(session);
     if (session.ok) response = await send(method, url, body, await fetchCsrf());
@@ -121,6 +124,8 @@ async function getAllPages<T>(path: string): Promise<T[]> {
 }
 
 export const api = {
+  registerOwner: (data: OwnerRegistrationRequest) =>
+    mutate<UserAccountResponse>('POST', '/api/auth/register/owner', data, true),
   currentUser: () => get<UserAccountResponse>('/api/users/me'),
   currentOwner: () => get<AssetOwnerResponse>('/api/owners/me'),
   currentCompany: () => get<ServiceCompanyResponse>('/api/companies/me'),

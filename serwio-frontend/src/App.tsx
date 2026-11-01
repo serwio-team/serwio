@@ -10,6 +10,7 @@ import { CompanyDashboardPage } from './pages/CompanyDashboardPage';
 import { LocationsPage } from './pages/LocationsPage';
 import { ServiceObjectsPage } from './pages/ServiceObjectsPage';
 import { SignInPage } from './pages/SignInPage';
+import { SignUpPage } from './pages/SignUpPage';
 import { TechnicianDashboardPage } from './pages/TechnicianDashboardPage';
 import { TechniciansPage } from './pages/TechniciansPage';
 import { queryKeys, useCurrentUser } from './queries';
@@ -26,6 +27,7 @@ export function App() {
       <SessionWatcher />
       <Routes>
         <Route path="/sign-in" element={<SignInPage />} />
+        <Route path="/sign-up" element={<SignUpPage />} />
         <Route index element={<RequireRole />} />
         <Route element={<RequireRole role="ASSET_OWNER" />}>
           <Route path="/locations" element={<LocationsPage />} />

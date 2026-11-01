@@ -3,6 +3,7 @@ package serwio.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
@@ -28,6 +29,7 @@ public class SecurityConfig {
         return http
                 .addFilterBefore(new AccountStatusFilter(accounts), AuthorizationFilter.class)
                 .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers(HttpMethod.POST, "/api/auth/register/owner").permitAll()
                         .requestMatchers("/api/csrf").permitAll()
                         .requestMatchers("/api", "/api/users/me", "/api/users/me/password").authenticated()
                         .requestMatchers("/api/owners/me").hasRole("ASSET_OWNER")

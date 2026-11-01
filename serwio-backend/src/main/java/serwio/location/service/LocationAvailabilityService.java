@@ -81,7 +81,8 @@ public class LocationAvailabilityService {
         for (var row : rows) {
             if (!row.isEndsAtMidnight() || row.getAvailableFrom().equals(LocalTime.MIDNIGHT)) continue;
             var next = rows.stream().filter(candidate -> candidate.getDayOfWeek() == row.getDayOfWeek() % 7 + 1
-                    && candidate.getAvailableFrom().equals(LocalTime.MIDNIGHT) && !candidate.isEndsAtMidnight())
+                    && candidate.getAvailableFrom().equals(LocalTime.MIDNIGHT) && !candidate.isEndsAtMidnight()
+                    && candidate.getAvailableTo().isBefore(row.getAvailableFrom()))
                     .findFirst();
             if (next.isPresent()) {
                 consumed.add(row);

@@ -49,15 +49,16 @@ interface LoadMoreProps {
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
   onLoadMore: () => void;
+  label?: string;
 }
 
-export function LoadMore({ hasNextPage, isFetchingNextPage, onLoadMore }: LoadMoreProps) {
+export function LoadMore({ hasNextPage, isFetchingNextPage, onLoadMore, label = 'Pokaż więcej' }: LoadMoreProps) {
   if (!hasNextPage) return null;
   return (
     <div className="table-footer">
       <button type="button" className="btn btn-secondary btn-sm" onClick={onLoadMore} disabled={isFetchingNextPage}>
         {isFetchingNextPage && <Loader2 size={14} className="spin" aria-hidden />}
-        {isFetchingNextPage ? 'Ładowanie…' : 'Pokaż więcej'}
+        {isFetchingNextPage ? 'Ładowanie…' : label}
       </button>
     </div>
   );

@@ -8,7 +8,10 @@ import { BranchDetailsPage } from './pages/BranchDetailsPage';
 import { BranchesPage } from './pages/BranchesPage';
 import { CompanyDashboardPage } from './pages/CompanyDashboardPage';
 import { LocationsPage } from './pages/LocationsPage';
+import { OrdersPage } from './pages/OrdersPage';
+import { ServiceObjectDetailsPage } from './pages/ServiceObjectDetailsPage';
 import { ServiceObjectsPage } from './pages/ServiceObjectsPage';
+import { ServiceOrderDetailsPage } from './pages/ServiceOrderDetailsPage';
 import { SignInPage } from './pages/SignInPage';
 import { TechnicianDashboardPage } from './pages/TechnicianDashboardPage';
 import { TechniciansPage } from './pages/TechniciansPage';
@@ -30,6 +33,9 @@ export function App() {
         <Route element={<RequireRole role="ASSET_OWNER" />}>
           <Route path="/locations" element={<LocationsPage />} />
           <Route path="/service-objects" element={<ServiceObjectsPage />} />
+          <Route path="/service-objects/:id" element={<ServiceObjectDetailsPage />} />
+          <Route path="/orders" element={<OrdersPage />} />
+          <Route path="/orders/:id" element={<ServiceOrderDetailsPage />} />
         </Route>
         <Route element={<RequireRole role="TECHNICIAN" />}>
           <Route path="/technician" element={<TechnicianDashboardPage />} />
@@ -99,8 +105,6 @@ function NotFound() {
   );
 }
 
-// Po 401 w trakcie pracy (wygasła sesja) przenosi na logowanie i czyści dane poprzedniej sesji.
-// Przy pierwszym wejściu bez sesji przekierowuje RequireRole, więc tu nic nie robimy.
 function SessionWatcher() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();

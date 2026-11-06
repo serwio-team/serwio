@@ -3,6 +3,7 @@ import {
   Box,
   Building2,
   ChevronDown,
+  ClipboardList,
   LayoutDashboard,
   Loader2,
   LogOut,
@@ -30,6 +31,7 @@ const NAV_BY_ROLE: Record<string, { section: string; items: NavItem[] }> = {
     items: [
       { to: '/locations', label: 'Lokalizacje', icon: MapPin },
       { to: '/service-objects', label: 'Urządzenia', icon: Box },
+      { to: '/orders', label: 'Zlecenia', icon: ClipboardList },
     ],
   },
   SERVICE_COMPANY: {

@@ -199,6 +199,7 @@ tbody tr:hover { background: var(--surface-2); }
 .col-actions { width: 1%; white-space: nowrap; text-align: right; }
 .row-actions { display: inline-flex; gap: 2px; opacity: 0.55; transition: opacity 0.12s; }
 tr:hover .row-actions, .row-actions:focus-within { opacity: 1; }
+.row-actions-group { display: inline-flex; align-items: center; gap: 8px; }
 .cell-title { display: inline-flex; align-items: center; gap: 10px; font-weight: 500; }
 .cell-text { display: flex; flex-direction: column; min-width: 0; }
 .cell-sub { display: none; font-size: 12.5px; font-weight: 400; color: var(--text-3); }
@@ -333,6 +334,7 @@ tr:hover .row-actions, .row-actions:focus-within { opacity: 1; }
 
 .badge-success { background: var(--success-soft); color: var(--success); }
 .badge-warning { background: var(--warning-soft); color: var(--warning); }
+.badge-info { background: var(--info-soft); color: var(--info); }
 .badge-neutral { background: var(--bg); color: var(--text-2); border: 1px solid var(--border); }
 .inline-alert-warning { background: var(--warning-soft); color: var(--warning); }
 
@@ -381,6 +383,43 @@ tr:hover .row-actions, .row-actions:focus-within { opacity: 1; }
 .check-field > span { display: flex; flex-direction: column; gap: 2px; }
 .field input:disabled { background: var(--surface-2); color: var(--text-2); }
 
+.skeleton-line { display: block; width: 60%; height: 12px; margin: 4px 0; }
+
+.order-preview {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px;
+  padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2);
+}
+.order-preview-item { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.order-preview-item .cell-text { min-width: 0; overflow-wrap: anywhere; }
+.order-preview-item .cell-sub { display: block; }
+.order-preview-label { font-size: 12px; color: var(--text-3); }
+
+.choice-field { border: 0; padding: 0; margin: 0 0 14px; min-width: 0; }
+.choice-field legend { padding: 0; margin-bottom: 6px; }
+.choice-group { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.choice {
+  display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; cursor: pointer;
+  border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface);
+  transition: border-color 0.12s, background-color 0.12s;
+}
+.choice:hover { border-color: var(--text-3); }
+.choice input { width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--accent); flex: none; }
+.choice:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.choice-selected { border-color: var(--accent); background: var(--accent-soft); }
+.choice-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.choice-title { font-size: 13.5px; font-weight: 500; }
+.choice-description { font-size: 12.5px; color: var(--text-2); }
+.field-invalid .choice { border-color: var(--danger); }
+
+.details-layout { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start; }
+.details-card { padding: 16px 20px; min-width: 0; }
+.details-heading { margin-bottom: 12px; font-size: 14px; font-weight: 600; }
+.details-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.55; }
+.details-list { display: grid; gap: 14px; margin: 0; }
+.details-list dt { margin-bottom: 3px; color: var(--text-2); font-size: 12px; }
+.details-list dd { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
+.details-sub { display: block; font-weight: 400; color: var(--text-2); font-size: 13px; }
+
 @media (max-width: 860px) {
   .sidebar { transform: translateX(-100%); transition: transform 0.2s ease; box-shadow: none; }
   .shell-menu-open .sidebar { transform: none; box-shadow: var(--shadow-lg); }
@@ -405,6 +444,9 @@ tr:hover .row-actions, .row-actions:focus-within { opacity: 1; }
   .cell-sub { display: block; }
   .row-actions { opacity: 1; }
   .modal-footer .btn { flex: 1; }
+  .btn-label { display: none; }
+  .order-preview, .choice-group, .details-layout { grid-template-columns: minmax(0, 1fr); }
+  .details-card { padding: 16px; }
 }
 
 .technician-dashboard { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }

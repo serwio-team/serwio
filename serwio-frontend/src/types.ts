@@ -151,3 +151,33 @@ export interface TechnicianUpdateRequest {
 export interface TechnicianPasswordRequest {
   password: string;
 }
+
+export type ServiceOrderType = 'REPAIR' | 'INSPECTION';
+
+export type ServiceOrderStatus = 'NEW' | 'AWAITING_TECHNICIAN_REVIEW' | 'AWAITING_OWNER_CONFIRMATION';
+
+export interface ServiceOrderRequest {
+  serviceObjectId: string;
+  orderType: ServiceOrderType;
+  description: string;
+}
+
+export interface ServiceOrderResponse {
+  id: string;
+  serviceObjectId: string;
+  serviceObjectName: string;
+  locationId: string;
+  locationName: string;
+  addressLine: string;
+  city: string;
+  timezone: string;
+  assetOwnerId: string;
+  assetOwnerName: string;
+  serviceCompanyId: string;
+  orderType: string;
+  description: string;
+  currentStatus: string;
+  createdByUserId: string;
+  createdAt: string;
+  closedAt: string | null;
+}

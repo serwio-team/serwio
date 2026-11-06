@@ -16,3 +16,14 @@ export function BranchStatusBadge({ active }: { active: boolean }) {
     ? <span className="badge badge-success">Aktywny</span>
     : <span className="badge badge-neutral">Nieaktywny</span>;
 }
+
+const SERVICE_ORDER_STATUS: Record<string, { label: string; tone: string }> = {
+  NEW: { label: 'Nowe', tone: 'info' },
+  AWAITING_TECHNICIAN_REVIEW: { label: 'Oczekuje na serwisanta', tone: 'warning' },
+  AWAITING_OWNER_CONFIRMATION: { label: 'Oczekuje na potwierdzenie właściciela', tone: 'warning' },
+};
+
+export function ServiceOrderStatusBadge({ status }: { status: string }) {
+  const { label, tone } = SERVICE_ORDER_STATUS[status] ?? { label: status, tone: 'neutral' };
+  return <span className={`badge badge-${tone}`}>{label}</span>;
+}

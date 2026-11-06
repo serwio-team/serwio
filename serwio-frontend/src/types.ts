@@ -154,12 +154,28 @@ export interface TechnicianPasswordRequest {
 
 export type ServiceOrderType = 'REPAIR' | 'INSPECTION';
 
-export type ServiceOrderStatus = 'NEW' | 'AWAITING_TECHNICIAN_REVIEW' | 'AWAITING_OWNER_CONFIRMATION';
+export type ServiceOrderStatus =
+  | 'NEW'
+  | 'AWAITING_TECHNICIAN_REVIEW'
+  | 'AWAITING_OWNER_CONFIRMATION'
+  | 'CLOSED'
+  | 'CANCELLED';
 
 export interface ServiceOrderRequest {
   serviceObjectId: string;
   orderType: ServiceOrderType;
   description: string;
+}
+
+export interface ServiceOrderListItemResponse {
+  id: string;
+  serviceObjectId: string;
+  serviceObjectName: string;
+  locationId: string;
+  locationName: string;
+  orderType: string;
+  currentStatus: string;
+  createdAt: string;
 }
 
 export interface ServiceOrderResponse {

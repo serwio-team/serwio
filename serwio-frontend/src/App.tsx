@@ -8,6 +8,7 @@ import { BranchDetailsPage } from './pages/BranchDetailsPage';
 import { BranchesPage } from './pages/BranchesPage';
 import { CompanyDashboardPage } from './pages/CompanyDashboardPage';
 import { LocationsPage } from './pages/LocationsPage';
+import { OrdersPage } from './pages/OrdersPage';
 import { ServiceObjectDetailsPage } from './pages/ServiceObjectDetailsPage';
 import { ServiceObjectsPage } from './pages/ServiceObjectsPage';
 import { ServiceOrderDetailsPage } from './pages/ServiceOrderDetailsPage';
@@ -33,7 +34,8 @@ export function App() {
           <Route path="/locations" element={<LocationsPage />} />
           <Route path="/service-objects" element={<ServiceObjectsPage />} />
           <Route path="/service-objects/:id" element={<ServiceObjectDetailsPage />} />
-          <Route path="/service-orders/:id" element={<ServiceOrderDetailsPage />} />
+          <Route path="/orders" element={<OrdersPage />} />
+          <Route path="/orders/:id" element={<ServiceOrderDetailsPage />} />
         </Route>
         <Route element={<RequireRole role="TECHNICIAN" />}>
           <Route path="/technician" element={<TechnicianDashboardPage />} />

@@ -150,7 +150,7 @@ function ServiceOrderForm({ object, onClose }: { object: ServiceObjectResponse; 
     create.mutate({ serviceObjectId: object.id, orderType, description: description.trim() }, {
       onSuccess: (created) => {
         toast.success(`Utworzono zlecenie: ${serviceOrderTypeLabel(created.orderType).toLowerCase()} — ${created.serviceObjectName}.`);
-        navigate(`/service-orders/${encodeURIComponent(created.id)}`);
+        navigate(`/orders/${encodeURIComponent(created.id)}`);
       },
       onError: (e) => {
         if (e instanceof ApiError && e.status === 404) {

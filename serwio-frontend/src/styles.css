@@ -57,7 +57,7 @@ code { font-size: 0.9em; background: var(--surface-2); border: 1px solid var(--b
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid transparent;
-  font: inherit; font-weight: 500; font-size: 13px; cursor: pointer; white-space: nowrap;
+  font: inherit; font-weight: 500; font-size: 13px; cursor: pointer; white-space: nowrap; text-decoration: none;
   transition: background-color 0.12s, border-color 0.12s, color 0.12s;
 }
 .btn:disabled { opacity: 0.6; cursor: default; }
@@ -199,6 +199,16 @@ tbody tr:hover { background: var(--surface-2); }
 .col-actions { width: 1%; white-space: nowrap; text-align: right; }
 .row-actions { display: inline-flex; gap: 2px; opacity: 0.55; transition: opacity 0.12s; }
 tr:hover .row-actions, .row-actions:focus-within { opacity: 1; }
+.tabs { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+.tab {
+  height: 36px; padding: 0 12px; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent;
+  background: none; font: inherit; font-size: 13.5px; font-weight: 500; color: var(--text-2); cursor: pointer;
+}
+.tab:hover { color: var(--text); }
+.tab-active { color: var(--text); border-bottom-color: var(--accent); }
+.nowrap { white-space: nowrap; }
+.col-primary { min-width: 200px; }
+.cell-meta { display: block; font-size: 12.5px; font-weight: 400; color: var(--text-2); }
 .row-actions-group { display: inline-flex; align-items: center; gap: 8px; }
 .cell-title { display: inline-flex; align-items: center; gap: 10px; font-weight: 500; }
 .cell-text { display: flex; flex-direction: column; min-width: 0; }
@@ -441,6 +451,7 @@ tr:hover .row-actions, .row-actions:focus-within { opacity: 1; }
   .filter, .filter select { width: 100%; min-width: 0; }
   th, td { padding-left: 12px; padding-right: 12px; }
   .col-wide { display: none; }
+  .col-primary { min-width: 0; }
   .cell-sub { display: block; }
   .row-actions { opacity: 1; }
   .modal-footer .btn { flex: 1; }

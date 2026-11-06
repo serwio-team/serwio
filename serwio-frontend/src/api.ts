@@ -12,6 +12,7 @@ import type {
   ServiceObjectListItemResponse,
   ServiceObjectRequest,
   ServiceObjectResponse,
+  ServiceOrderListItemResponse,
   ServiceOrderRequest,
   ServiceOrderResponse,
   TechnicianCreateRequest,
@@ -24,6 +25,7 @@ import type {
 
 export const PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
+const SERVER_ORDER_STATUS_FILTERS = ['NEW', 'AWAITING_TECHNICIAN_REVIEW', 'AWAITING_OWNER_CONFIRMATION'];
 const MOCK_SERVICE_ORDERS = import.meta.env.VITE_MOCK_SERVICE_ORDERS === 'true';
 
 export class ApiError extends Error {
@@ -128,6 +130,24 @@ async function getAllPages<T>(path: string): Promise<T[]> {
   }
 }
 
+export interface ServiceOrderPage {
+  items: ServiceOrderListItemResponse[];
+  nextPage?: number;
+}
+
+async function listServiceOrders(statuses: string[], page: number): Promise<ServiceOrderPage> {
+  const status = statuses.length === 1 && SERVER_ORDER_STATUS_FILTERS.includes(statuses[0]) ? statuses[0] : undefined;
+  const items: ServiceOrderListItemResponse[] = [];
+  for (let current = page; ; current++) {
+    const batch = await get<ServiceOrderListItemResponse[]>(
+      `/api/service-orders?${pageQuery(current, PAGE_SIZE, { status })}`,
+    );
+    items.push(...batch.filter((order) => statuses.includes(order.currentStatus)));
+    if (batch.length < PAGE_SIZE) return { items };
+    if (items.length >= PAGE_SIZE) return { items, nextPage: current + 1 };
+  }
+}
+
 export const api = {
   currentUser: () => get<UserAccountResponse>('/api/users/me'),
   currentOwner: () => get<AssetOwnerResponse>('/api/owners/me'),
@@ -179,6 +199,7 @@ export const api = {
     mutate<ServiceObjectResponse>('PUT', `/api/service-objects/${encodeURIComponent(id)}`, data),
   deleteServiceObject: (id: string) => mutate<void>('DELETE', `/api/service-objects/${encodeURIComponent(id)}`),
 
+  listServiceOrders,
   createServiceOrder: (data: ServiceOrderRequest) => mutate<ServiceOrderResponse>('POST', '/api/service-orders', data),
   getServiceOrder: (id: string) => get<ServiceOrderResponse>(`/api/service-orders/${encodeURIComponent(id)}`),
 

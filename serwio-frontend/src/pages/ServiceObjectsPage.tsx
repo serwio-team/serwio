@@ -1,11 +1,12 @@
-import { Box, MapPin, Plus } from 'lucide-react';
+import { Box, ClipboardPlus, MapPin, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ApiError, errorMessage } from '../api';
 import { EmptyState, ErrorState, LoadMore, PageHeader, TableSkeleton } from '../components/DataState';
 import { ConfirmDialog } from '../components/Modal';
 import { RowActions } from '../components/RowActions';
 import { ServiceObjectFormModal, serviceObjectTypeLabel } from '../components/ServiceObjectForm';
+import { ServiceOrderCreateModal } from '../components/ServiceOrderForm';
 import { useToast } from '../components/Toast';
 import { useAllLocations, useDeleteServiceObject, useServiceObjectList } from '../queries';
 import type { ServiceObjectListItemResponse } from '../types';
@@ -22,6 +23,7 @@ export function ServiceObjectsPage() {
   const toast = useToast();
   const [form, setForm] = useState<FormState>(null);
   const [toDelete, setToDelete] = useState<ServiceObjectListItemResponse | null>(null);
+  const [orderFor, setOrderFor] = useState<string | null>(null);
 
   useEffect(() => {
     if (locationId && locations.data && !locations.data.some((l) => l.id === locationId)) {
@@ -87,7 +89,7 @@ export function ServiceObjectsPage() {
               <thead>
                 <tr>
                   <th>Nazwa</th>
-                  <th>Typ</th>
+                  <th className="col-wide">Typ</th>
                   <th className="col-wide">Lokalizacja</th>
                   <th className="col-actions"><span className="sr-only">Akcje</span></th>
                 </tr>
@@ -99,22 +101,34 @@ export function ServiceObjectsPage() {
                   {items.map((o) => (
                     <tr key={o.id}>
                       <td>
-                        <span className="cell-title">
+                        <Link to={`/service-objects/${encodeURIComponent(o.id)}`} className="cell-title cell-link">
                           <span className="cell-icon" aria-hidden><Box size={14} /></span>
                           <span className="cell-text">
                             {o.name}
                             <span className="cell-sub">{o.locationName}</span>
+                            <span className="cell-sub cell-badge"><span className="badge">{serviceObjectTypeLabel(o.type)}</span></span>
                           </span>
-                        </span>
+                        </Link>
                       </td>
-                      <td><span className="badge" title={o.type}>{serviceObjectTypeLabel(o.type)}</span></td>
+                      <td className="col-wide"><span className="badge" title={o.type}>{serviceObjectTypeLabel(o.type)}</span></td>
                       <td className="muted col-wide">{o.locationName}</td>
                       <td className="col-actions">
-                        <RowActions
-                          name={o.name}
-                          onEdit={() => setForm({ mode: 'edit', id: o.id })}
-                          onDelete={() => setToDelete(o)}
-                        />
+                        <div className="row-actions-group">
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => setOrderFor(o.id)}
+                            aria-label={`Utwórz zlecenie: ${o.name}`}
+                            title="Utwórz zlecenie"
+                          >
+                            <ClipboardPlus size={14} aria-hidden /> <span className="btn-label">Utwórz zlecenie</span>
+                          </button>
+                          <RowActions
+                            name={o.name}
+                            onEdit={() => setForm({ mode: 'edit', id: o.id })}
+                            onDelete={() => setToDelete(o)}
+                          />
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -138,6 +152,7 @@ export function ServiceObjectsPage() {
           onAddLocation={() => navigate('/locations', { state: { create: true } })}
         />
       )}
+      {orderFor && <ServiceOrderCreateModal serviceObjectId={orderFor} onClose={() => setOrderFor(null)} />}
       {toDelete && (
         <ConfirmDialog
           title="Usunąć urządzenie?"

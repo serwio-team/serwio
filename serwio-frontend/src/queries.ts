@@ -5,6 +5,7 @@ import type {
   PasswordChangeRequest,
   ServiceBranchRequest,
   ServiceObjectRequest,
+  ServiceOrderRequest,
   TechnicianCreateRequest,
   TechnicianPasswordRequest,
   TechnicianUpdateRequest,
@@ -22,6 +23,8 @@ export const queryKeys = {
   serviceObjects: ['service-objects'] as const,
   serviceObjectList: (locationId?: string) => ['service-objects', 'list', locationId ?? 'all'] as const,
   serviceObject: (id: string) => ['service-objects', 'detail', id] as const,
+  serviceOrders: ['service-orders'] as const,
+  serviceOrder: (id: string) => ['service-orders', 'detail', id] as const,
   companySummary: ['companies', 'me', 'summary'] as const,
   branches: ['branches'] as const,
   branchList: ['branches', 'list'] as const,
@@ -142,6 +145,31 @@ export function useDeleteServiceObject() {
   return useMutation({
     mutationFn: (id: string) => api.deleteServiceObject(id),
     onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.serviceObjects }),
+  });
+}
+
+export function useServiceOrder(id: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.serviceOrder(id ?? ''),
+    queryFn: () => api.getServiceOrder(id!),
+    enabled: Boolean(id),
+  });
+}
+
+export function useCreateServiceOrder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: ServiceOrderRequest) => api.createServiceOrder(data),
+    onSuccess: (created) => {
+      queryClient.setQueryData(queryKeys.serviceOrder(created.id), created);
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.serviceOrders,
+        predicate: (query) => query.queryKey[1] !== 'detail',
+      });
+    },
+    onError: (error) => {
+      if (isNotFound(error)) void queryClient.invalidateQueries({ queryKey: queryKeys.serviceObjects });
+    },
   });
 }
 

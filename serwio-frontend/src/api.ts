@@ -1,3 +1,4 @@
+import { mockServiceOrderFetch } from './mocks/serviceOrders';
 import type {
   AssetOwnerResponse,
   CompanySummaryResponse,
@@ -11,6 +12,8 @@ import type {
   ServiceObjectListItemResponse,
   ServiceObjectRequest,
   ServiceObjectResponse,
+  ServiceOrderRequest,
+  ServiceOrderResponse,
   TechnicianCreateRequest,
   TechnicianPasswordRequest,
   TechnicianProfileResponse,
@@ -21,6 +24,7 @@ import type {
 
 export const PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
+const MOCK_SERVICE_ORDERS = import.meta.env.VITE_MOCK_SERVICE_ORDERS === 'true';
 
 export class ApiError extends Error {
   constructor(
@@ -78,8 +82,12 @@ async function readBody<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
 
+function request(url: string, init?: RequestInit): Promise<Response> {
+  return MOCK_SERVICE_ORDERS && url.startsWith('/api/service-orders') ? mockServiceOrderFetch(url, init) : fetch(url, init);
+}
+
 async function get<T>(url: string): Promise<T> {
-  const response = await fetch(url, { headers: { Accept: 'application/json' } });
+  const response = await request(url, { headers: { Accept: 'application/json' } });
   if (!response.ok) throw await toApiError(response);
   return readBody<T>(response);
 }
@@ -87,7 +95,7 @@ async function get<T>(url: string): Promise<T> {
 async function send(method: string, url: string, body: unknown, csrf: CsrfToken): Promise<Response> {
   const headers: Record<string, string> = { Accept: 'application/json', [csrf.headerName]: csrf.token };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
-  return fetch(url, {
+  return request(url, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -170,6 +178,9 @@ export const api = {
   updateServiceObject: (id: string, data: ServiceObjectRequest) =>
     mutate<ServiceObjectResponse>('PUT', `/api/service-objects/${encodeURIComponent(id)}`, data),
   deleteServiceObject: (id: string) => mutate<void>('DELETE', `/api/service-objects/${encodeURIComponent(id)}`),
+
+  createServiceOrder: (data: ServiceOrderRequest) => mutate<ServiceOrderResponse>('POST', '/api/service-orders', data),
+  getServiceOrder: (id: string) => get<ServiceOrderResponse>(`/api/service-orders/${encodeURIComponent(id)}`),
 
   companySummary: () => get<CompanySummaryResponse>('/api/companies/me/summary'),
 

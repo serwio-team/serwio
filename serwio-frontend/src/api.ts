@@ -1,5 +1,7 @@
 import { mockServiceOrderFetch } from './mocks/serviceOrders';
 import type {
+  AvailabilityRequest,
+  AvailabilityResponse,
   AssetOwnerResponse,
   CompanySummaryResponse,
   LocationListItemResponse,
@@ -190,6 +192,10 @@ export const api = {
   updateLocation: (id: string, data: LocationRequest) =>
     mutate<LocationResponse>('PUT', `/api/locations/${encodeURIComponent(id)}`, data),
   deleteLocation: (id: string) => mutate<void>('DELETE', `/api/locations/${encodeURIComponent(id)}`),
+  getAvailability: (id: string) =>
+    get<AvailabilityResponse>(`/api/locations/${encodeURIComponent(id)}/availability`),
+  saveAvailability: (id: string, data: AvailabilityRequest) =>
+    mutate<AvailabilityResponse>('PUT', `/api/locations/${encodeURIComponent(id)}/availability`, data),
 
   listServiceObjects: (page: number, locationId?: string) =>
     get<ServiceObjectListItemResponse[]>(`/api/service-objects?${pageQuery(page, PAGE_SIZE, { locationId })}`),

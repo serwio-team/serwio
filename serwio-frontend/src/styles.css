@@ -277,6 +277,16 @@ tr:hover .row-actions, .row-actions:focus-within { opacity: 1; }
   border-top: 1px solid var(--border); background: var(--surface-2);
 }
 .modal-loading { display: grid; place-items: center; padding: 48px; color: var(--text-3); }
+.availability-body { display: grid; gap: 14px; padding-bottom: 18px; }
+.availability-fields { border: 0; padding: 0; min-width: 0; }
+.availability-day { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin-top: 14px; min-width: 0; }
+.availability-day legend { font-weight: 600; padding: 0 4px; }
+.availability-day > p { margin-bottom: 10px; }
+.availability-interval { display: flex; align-items: flex-start; gap: 8px; }
+.availability-interval > .btn-icon { margin-top: 25px; flex-shrink: 0; }
+.availability-summary { font-size: 13px; }
+.availability-summary dl > div { display: grid; grid-template-columns: minmax(100px, 1fr) 2fr; gap: 8px; margin-top: 6px; }
+.availability-summary dd { margin: 0; overflow-wrap: anywhere; }
 .confirm-body { display: flex; gap: 12px; align-items: flex-start; padding-bottom: 18px; }
 .confirm-body p { color: var(--text-2); padding-top: 4px; }
 .confirm-icon {

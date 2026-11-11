@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, PAGE_SIZE, api } from './api';
 import type {
+  AvailabilityRequest,
   LocationRequest,
   PasswordChangeRequest,
   ServiceBranchRequest,
@@ -20,6 +21,7 @@ export const queryKeys = {
   locationList: ['locations', 'list'] as const,
   allLocations: ['locations', 'all'] as const,
   location: (id: string) => ['locations', 'detail', id] as const,
+  availability: (id: string) => ['locations', 'availability', id] as const,
   serviceObjects: ['service-objects'] as const,
   serviceObjectList: (locationId?: string) => ['service-objects', 'list', locationId ?? 'all'] as const,
   serviceObject: (id: string) => ['service-objects', 'detail', id] as const,
@@ -82,6 +84,22 @@ export function useLocation(id: string | undefined) {
     queryKey: queryKeys.location(id ?? ''),
     queryFn: () => api.getLocation(id!),
     enabled: Boolean(id),
+  });
+}
+
+export function useAvailability(id: string) {
+  return useQuery({
+    queryKey: queryKeys.availability(id),
+    queryFn: () => api.getAvailability(id),
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useSaveAvailability(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: AvailabilityRequest) => api.saveAvailability(id, data),
+    onSuccess: (saved) => queryClient.setQueryData(queryKeys.availability(id), saved),
   });
 }
 

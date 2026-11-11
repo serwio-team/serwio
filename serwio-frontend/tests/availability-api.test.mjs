@@ -1,16 +1,24 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import test from 'node:test';
-import ts from 'typescript';
+import test, { after } from 'node:test';
+import { fileURLToPath } from 'node:url';
+import { createServer } from 'vite';
 
-const source = await readFile(new URL('../src/api.ts', import.meta.url), 'utf8');
-const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 } });
-const moduleUrl = `data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`;
+const vite = await createServer({
+  root: fileURLToPath(new URL('..', import.meta.url)),
+  configFile: false,
+  envFile: false,
+  server: { middlewareMode: true, watch: null, ws: false },
+});
+after(() => vite.close());
+
+function loadApi(testCase) {
+  return vite.ssrLoadModule(`/src/api.ts?case=${testCase}`);
+}
 const csrf = { headerName: 'X-CSRF-TOKEN', parameterName: '_csrf', token: 'test-token' };
 const saved = { locationId: 'location', timezone: 'Pacific/Auckland', days: [] };
 
 test('availability uses existing GET/PUT client, CSRF and server response', async (t) => {
-  const { api } = await import(`${moduleUrl}#success`);
+  const { api } = await loadApi('success');
   const calls = [];
   t.mock.method(globalThis, 'fetch', async (url, options) => {
     calls.push({ url, options });
@@ -25,7 +33,7 @@ test('availability uses existing GET/PUT client, CSRF and server response', asyn
 });
 
 test('400 retains detail and field paths; 404 and network errors are propagated', async (t) => {
-  const { api, ApiError } = await import(`${moduleUrl}#errors`);
+  const { api, ApiError } = await loadApi('errors');
   const errors = { 'days[0].intervals[0].from': ['Niepoprawna godzina.'] };
   for (const status of [400, 404]) {
     t.mock.method(globalThis, 'fetch', async () => Response.json({ detail: 'Niepoprawny harmonogram.', errors }, { status }));
@@ -45,7 +53,7 @@ test('400 retains detail and field paths; 404 and network errors are propagated'
 });
 
 test('403 refreshes CSRF once through existing session check', async (t) => {
-  const { api } = await import(`${moduleUrl}#csrf`);
+  const { api } = await loadApi('csrf');
   const calls = [];
   let puts = 0;
   t.mock.method(globalThis, 'fetch', async (url, options) => {
@@ -60,7 +68,7 @@ test('403 refreshes CSRF once through existing session check', async (t) => {
 });
 
 test('401 dispatches existing session expiration event; persistent 403 remains an error', async (t) => {
-  const { api, ApiError, UNAUTHORIZED_EVENT } = await import(`${moduleUrl}#auth`);
+  const { api, ApiError, UNAUTHORIZED_EVENT } = await loadApi('auth');
   const events = new EventTarget();
   globalThis.window = events;
   t.after(() => { delete globalThis.window; });

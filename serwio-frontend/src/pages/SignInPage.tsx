@@ -1,16 +1,17 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Info, Loader2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { api, errorMessage } from '../api';
 import { useCurrentUser } from '../queries';
 
 interface SignInState {
-  reason?: 'expired' | 'signed-out';
+  reason?: 'expired' | 'signed-out' | 'registered';
   from?: string;
 }
 
 const NOTICES = {
+  registered: 'Konto zostało utworzone. Możesz się zalogować.',
   expired: 'Sesja wygasła. Zaloguj się ponownie.',
   'signed-out': 'Wylogowano.',
 };
@@ -94,6 +95,7 @@ export function SignInPage() {
             {pending ? 'Logowanie…' : 'Zaloguj się'}
           </button>
         </form>
+        <p className="auth-link"><Link to="/sign-up">Nie masz konta? Zarejestruj się</Link></p>
       </div>
     </div>
   );

@@ -29,6 +29,7 @@ public class SecurityConfig {
         return http
                 .addFilterBefore(new AccountStatusFilter(accounts), AuthorizationFilter.class)
                 .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers(HttpMethod.POST, "/api/auth/register/owner").permitAll()
                         .requestMatchers("/api/csrf").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/service-orders").hasRole("ASSET_OWNER")
                         .requestMatchers(HttpMethod.GET, "/api/service-orders", "/api/service-orders/**")

@@ -7,6 +7,14 @@ export interface UserAccountResponse {
   createdAt: string;
 }
 
+export interface OwnerRegistrationRequest {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+}
+
 export interface AssetOwnerResponse {
   id: string;
   userId: string;

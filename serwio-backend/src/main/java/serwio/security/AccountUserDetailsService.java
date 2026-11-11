@@ -16,7 +16,7 @@ public class AccountUserDetailsService implements UserDetailsService {
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        return accounts.findByEmail(email).map(AccountPrincipal::new)
+        return accounts.findByNormalizedEmail(email).map(AccountPrincipal::new)
                 .orElseThrow(() -> new UsernameNotFoundException("Nieprawidłowy e-mail lub hasło"));
     }
 }

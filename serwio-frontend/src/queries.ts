@@ -24,6 +24,7 @@ export const queryKeys = {
   serviceObjectList: (locationId?: string) => ['service-objects', 'list', locationId ?? 'all'] as const,
   serviceObject: (id: string) => ['service-objects', 'detail', id] as const,
   serviceOrders: ['service-orders'] as const,
+  serviceOrderList: (statuses: string[]) => ['service-orders', 'list', statuses.join(',')] as const,
   serviceOrder: (id: string) => ['service-orders', 'detail', id] as const,
   companySummary: ['companies', 'me', 'summary'] as const,
   branches: ['branches'] as const,
@@ -145,6 +146,15 @@ export function useDeleteServiceObject() {
   return useMutation({
     mutationFn: (id: string) => api.deleteServiceObject(id),
     onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.serviceObjects }),
+  });
+}
+
+export function useServiceOrderList(statuses: string[]) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.serviceOrderList(statuses),
+    queryFn: ({ pageParam }) => api.listServiceOrders(statuses, pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextPage,
   });
 }
 

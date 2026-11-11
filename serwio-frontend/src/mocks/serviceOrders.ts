@@ -1,14 +1,16 @@
-import { serviceOrderFixtures, serviceOrderProblemFixtures } from '../fixtures/serviceOrders';
+import { serviceOrderFixtures, serviceOrderHistoryFixtures, serviceOrderProblemFixtures } from '../fixtures/serviceOrders';
 import type {
   AssetOwnerResponse,
   LocationResponse,
   ServiceObjectResponse,
+  ServiceOrderListItemResponse,
   ServiceOrderResponse,
   UserAccountResponse,
 } from '../types';
 
 const STORAGE_KEY = 'serwio:mock-service-orders';
 const ORDER_TYPES = ['REPAIR', 'INSPECTION'];
+const QUERY_STATUSES = ['NEW', 'AWAITING_TECHNICIAN_REVIEW', 'AWAITING_OWNER_CONFIRMATION'];
 const MAX_DESCRIPTION_LENGTH = 100000;
 
 function json(status: number, body: unknown): Response {
@@ -103,23 +105,54 @@ async function create(body: Record<string, unknown>): Promise<Response> {
   return json(201, order);
 }
 
+function allOrders(): ServiceOrderResponse[] {
+  const byId = new Map<string, ServiceOrderResponse>();
+  for (const order of [...Object.values(serviceOrderFixtures), ...serviceOrderHistoryFixtures, ...Object.values(readStore())]) {
+    byId.set(order.id, order);
+  }
+  return [...byId.values()];
+}
+
 function find(id: string): Response {
-  const fixtures: Record<string, ServiceOrderResponse> = Object.fromEntries(
-    Object.values(serviceOrderFixtures).map((order) => [order.id, order]),
-  );
-  const order = readStore()[id] ?? fixtures[id];
+  const order = allOrders().find((o) => o.id === id);
   return order ? json(200, order) : problem(serviceOrderProblemFixtures.orderNotFound);
+}
+
+function list(params: URLSearchParams): Response {
+  const status = params.get('status');
+  const page = Number(params.get('page') ?? 0);
+  const size = Number(params.get('size') ?? 20);
+  if ((status !== null && !QUERY_STATUSES.includes(status)) || !Number.isInteger(page) || page < 0
+      || !Number.isInteger(size) || size < 1 || size > 100) {
+    return problem(serviceOrderProblemFixtures.invalidQuery);
+  }
+  const items: ServiceOrderListItemResponse[] = allOrders()
+    .filter((o) => status === null || o.currentStatus === status)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id))
+    .slice(page * size, (page + 1) * size)
+    .map((o) => ({
+      id: o.id,
+      serviceObjectId: o.serviceObjectId,
+      serviceObjectName: o.serviceObjectName,
+      locationId: o.locationId,
+      locationName: o.locationName,
+      orderType: o.orderType,
+      currentStatus: o.currentStatus,
+      createdAt: o.createdAt,
+    }));
+  return json(200, items);
 }
 
 export async function mockServiceOrderFetch(url: string, init: RequestInit = {}): Promise<Response> {
   await new Promise((resolve) => setTimeout(resolve, 400));
-  const path = url.split('?')[0];
+  const [path, query = ''] = url.split('?');
   const method = (init.method ?? 'GET').toUpperCase();
 
   if (path === '/api/service-orders' && method === 'POST') {
     const body = typeof init.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : {};
     return create(body);
   }
+  if (path === '/api/service-orders' && method === 'GET') return list(new URLSearchParams(query));
   const match = /^\/api\/service-orders\/([^/]+)$/.exec(path);
   if (match && method === 'GET') return find(decodeURIComponent(match[1]));
   return problem({ status: 404, detail: 'Brak takiego zasobu w mocku zleceń.' });

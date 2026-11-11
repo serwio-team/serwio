@@ -15,13 +15,9 @@ export function ServiceOrderDetailsPage() {
   const order = useServiceOrder(id);
   const data = order.data;
 
-  const backLink = data ? (
-    <Link to={`/service-objects/${encodeURIComponent(data.serviceObjectId)}`} className="back-link">
-      <ArrowLeft size={14} aria-hidden /> {data.serviceObjectName}
-    </Link>
-  ) : (
-    <Link to="/service-objects" className="back-link">
-      <ArrowLeft size={14} aria-hidden /> Urządzenia
+  const backLink = (
+    <Link to="/orders" className="back-link">
+      <ArrowLeft size={14} aria-hidden /> Zlecenia
     </Link>
   );
 
@@ -107,7 +103,7 @@ function OrderDetails({ order }: { order: ServiceOrderResponse }) {
           </div>
           {order.closedAt && (
             <div>
-              <dt>Zamknięto</dt>
+              <dt>Zakończono</dt>
               <dd>{formatDate(order.closedAt)}</dd>
             </div>
           )}

@@ -36,6 +36,21 @@ public class SecurityConfig {
                                 .hasRole("SERVICE_COMPANY")
                         .requestMatchers(HttpMethod.PUT, "/api/service-orders/*/assignment")
                                 .hasRole("SERVICE_COMPANY")
+                        .requestMatchers(HttpMethod.GET, "/api/service-orders/*/visits/candidates")
+                                .hasRole("SERVICE_COMPANY")
+                        .requestMatchers(HttpMethod.GET, "/api/service-orders/*/visits")
+                                .hasAnyRole("ASSET_OWNER", "SERVICE_COMPANY", "TECHNICIAN")
+                        .requestMatchers(HttpMethod.POST, "/api/service-orders/*/visits",
+                                "/api/service-orders/*/visits/*/cancel")
+                                .hasRole("SERVICE_COMPANY")
+                        .requestMatchers(HttpMethod.PUT, "/api/service-orders/*/visits/*/staffing")
+                                .hasRole("SERVICE_COMPANY")
+                        .requestMatchers(HttpMethod.POST, "/api/service-orders/*/visits/*/proposals")
+                                .hasRole("TECHNICIAN")
+                        .requestMatchers(HttpMethod.POST, "/api/service-orders/*/visits/*/proposals/*/counter",
+                                "/api/service-orders/*/visits/*/proposals/*/reject",
+                                "/api/service-orders/*/visits/*/proposals/*/accept")
+                                .hasAnyRole("ASSET_OWNER", "TECHNICIAN")
                         .requestMatchers(HttpMethod.GET, "/api/service-orders", "/api/service-orders/*")
                                 .hasAnyRole("ASSET_OWNER", "SERVICE_COMPANY", "TECHNICIAN")
                         .requestMatchers("/api/service-orders", "/api/service-orders/**").denyAll()

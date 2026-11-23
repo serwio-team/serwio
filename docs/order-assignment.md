@@ -62,8 +62,7 @@ Dla zlecenia bez przydziału: `version: 0`, puste listy, `coordinatorTechnicianI
 - Realna zmiana zestawu lub koordynatora zwiększa `version` o 1. Zdjęte
   przydziały dostają `unassigned_at`, nie są usuwane. Dodane są nowymi wierszami.
 - Zmiana zestawu przy statusie `ASSIGNED` nie dopisuje wpisu historii statusów.
-- Przydział można edytować tylko w statusach `NEW` i `ASSIGNED`. Blokadę po
-  potwierdzeniu wizyty doda SCRUM-40.
+- Przydział można edytować w statusach `NEW`, `ASSIGNED` i `AWAITING_SCHEDULING`.
 - Zdjęcie wszystkich odbiorców nie jest obsługiwane.
 - Każdy zapis sprawdza cały zestaw na nowo. Jeśli oddział lub serwisant z
   aktualnego przydziału został w międzyczasie dezaktywowany, trzeba go usunąć z
@@ -90,6 +89,6 @@ Format `ProblemDetail`. Błędy pól są w `errors` (jak w pozostałych endpoint
 | 401 | Brak sesji |
 | 403 | Rola inna niż `SERVICE_COMPANY` (właściciel, serwisant), brak CSRF |
 | 404 | Zlecenie nie istnieje albo należy do innej firmy |
-| 409 | `expectedVersion` nieaktualna (ktoś zmienił przydział) albo status zlecenia inny niż `NEW`/`ASSIGNED` |
+| 409 | `expectedVersion` nieaktualna (ktoś zmienił przydział) albo status zlecenia spoza `NEW`, `ASSIGNED` i `AWAITING_SCHEDULING` |
 
 Pola `errors` w odpowiedzi 400: `branchIds`, `technicianIds`, `coordinatorTechnicianId`.

@@ -14,7 +14,7 @@ przy następnym żądaniu, także w tej samej sesji.
 
 | Parametr | Wartość domyślna | Znaczenie |
 | --- | --- | --- |
-| `status` | Brak filtra | `NEW`, `ASSIGNED`, `AWAITING_TECHNICIAN_REVIEW` lub `AWAITING_OWNER_CONFIRMATION` |
+| `status` | Brak filtra | `NEW`, `ASSIGNED`, `AWAITING_SCHEDULING`, `VISIT_CONFIRMED`, `AWAITING_TECHNICIAN_REVIEW` lub `AWAITING_OWNER_CONFIRMATION` |
 | `page` | `0` | Numer strony od zera |
 | `size` | `20` | Rozmiar strony od 1 do 100 |
 

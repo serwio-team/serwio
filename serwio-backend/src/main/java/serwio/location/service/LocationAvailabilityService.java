@@ -27,7 +27,12 @@ public class LocationAvailabilityService {
     public AvailabilityResponse get(UUID id) {
         var location = locations.findByIdAndAssetOwnerUserId(id, currentUser.id())
                 .orElseThrow(() -> notFound(id));
-        return response(location, availability.findAllByLocationIdOrderByDayOfWeekAscAvailableFromAsc(id));
+        return getForAuthorizedLocation(location);
+    }
+
+    public AvailabilityResponse getForAuthorizedLocation(Location location) {
+        var rows = availability.findAllByLocationIdOrderByDayOfWeekAscAvailableFromAsc(location.getId());
+        return response(location, rows);
     }
 
     @Transactional

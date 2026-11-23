@@ -29,6 +29,9 @@ public interface TechnicianRepository extends JpaRepository<Technician, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Technician> findForUpdateByIdAndBranchServiceCompanyUserId(UUID id, UUID userId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<Technician> findForUpdateById(UUID id);
+
     @EntityGraph(attributePaths = {"user", "branch"})
     List<Technician> findAllByIdInAndBranchServiceCompanyIdAndActiveTrueAndUserStatus(
             Collection<UUID> ids, UUID serviceCompanyId, String userStatus);

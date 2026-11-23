@@ -138,7 +138,7 @@ class ServiceOrderFlowTest {
             assertThat(company.get(orderPath).path("currentStatus").asText()).isEqualTo("REVISIT_REQUIRED");
             lastVisitStart = revisitStart;
         }
-        runVisit(owner, company, technician, orderPath, technicianId, lastVisitStart, "COMPLETED");
+        var completedVisitPath = runVisit(owner, company, technician, orderPath, technicianId, lastVisitStart, "COMPLETED");
         expectedHistory.addAll(List.of("AWAITING_SCHEDULING", "VISIT_CONFIRMED", "IN_PROGRESS", "COMPLETED", "CLOSED"));
         assertThat(company.post(orderPath + "/close", 409, null).path("code").asText()).isEqualTo("REPORT_NOT_FINALIZED");
 
@@ -161,6 +161,12 @@ class ServiceOrderFlowTest {
             assertThat(reader.get(orderPath).path("currentStatus").asText()).isEqualTo("CLOSED");
             assertThat(reader.get(reportPath).path("diagnosis").asText()).isEqualTo("Zatkany filtr");
         }
+        var staffing = Map.of("technicianIds", List.of(technicianId), "coordinatorTechnicianId", technicianId);
+        assertThat(company.post(orderPath + "/visits", 409, staffing).path("code").asText())
+                .isEqualTo("INVALID_VISIT_STATE");
+        company.put(completedVisitPath + "/staffing", 409, staffing);
+        company.post(completedVisitPath + "/cancel", 409, null);
+        technician.post(completedVisitPath + "/start", 404, null);
         var outsider = new Api();
         outsider.login("owner@example.com", COMPANY_PASSWORD);
         outsider.request("GET", reportPath, 404, null, null);
@@ -172,8 +178,8 @@ class ServiceOrderFlowTest {
         return Map.of("dayOfWeek", start.getDayOfWeek().getValue(), "intervals", List.of(Map.of("from", "08:00", "to", "16:00")));
     }
 
-    private void runVisit(Api owner, Api company, Api technician, String orderPath, String technicianId,
-                          OffsetDateTime start, String outcome) throws Exception {
+    private String runVisit(Api owner, Api company, Api technician, String orderPath, String technicianId,
+                            OffsetDateTime start, String outcome) throws Exception {
         var visit = company.post(orderPath + "/visits", 201, Map.of("technicianIds", List.of(technicianId),
                 "coordinatorTechnicianId", technicianId));
         var visitPath = orderPath + "/visits/" + visit.path("id").asText();
@@ -188,6 +194,7 @@ class ServiceOrderFlowTest {
         when(visitClock.instant()).thenReturn(start.plusMinutes(30).toInstant());
         assertThat(technician.post(visitPath + "/complete", 200, Map.of("outcome", outcome))
                 .path("outcome").asText()).isEqualTo(outcome);
+        return visitPath;
     }
 
     private final class Api {

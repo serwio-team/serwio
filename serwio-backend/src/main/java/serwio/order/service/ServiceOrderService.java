@@ -3,6 +3,7 @@ package serwio.order.service;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -69,27 +70,31 @@ public class ServiceOrderService {
         var role = role(userId);
         var pageable = PageRequest.of(page, size, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.asc("id")));
         var filter = status == null ? null : status.name();
-        var result = "ASSET_OWNER".equals(role) ? orders.findForOwner(userId, filter, pageable)
-                : orders.findForCompany(userId, filter, pageable);
+        var result = switch (role) {
+            case "ASSET_OWNER" -> orders.findForOwner(userId, filter, pageable);
+            case "SERVICE_COMPANY" -> orders.findForCompany(userId, filter, pageable);
+            case "TECHNICIAN" -> orders.findForTechnician(userId, filter, pageable);
+            default -> throw new AccessDeniedException("Brak dostępu do zleceń.");
+        };
         return result.getContent().stream().map(order -> new ServiceOrderListItemResponse(order.getId(),
                 order.getServiceObject().getId(), order.getServiceObject().getName(),
                 order.getServiceObject().getLocation().getId(), order.getServiceObject().getLocation().getName(),
                 order.getOrderType(), order.getCurrentStatus(), order.getCreatedAt())).toList();
     }
 
-    public ServiceOrderResponse get(UUID id) {
+    public ServiceOrderDetailsResponse get(UUID id) {
         var userId = currentUser.id();
-        var role = role(userId);
-        var result = "ASSET_OWNER".equals(role) ? orders.findByIdAndServiceObjectLocationAssetOwnerUserId(id, userId)
-                : orders.findByIdAndServiceCompanyUserId(id, userId);
-        return response(result.orElseThrow(() -> new ResourceNotFoundException("Nie znaleziono zlecenia: " + id)));
+        Optional<ServiceOrderDetailsResponse> result = switch (role(userId)) {
+            case "ASSET_OWNER" -> orders.findByIdAndServiceObjectLocationAssetOwnerUserId(id, userId).map(this::response);
+            case "SERVICE_COMPANY" -> orders.findByIdAndServiceCompanyUserId(id, userId).map(this::response);
+            case "TECHNICIAN" -> orders.findByIdForTechnician(id, userId).map(this::technicianResponse);
+            default -> throw new AccessDeniedException("Brak dostępu do zleceń.");
+        };
+        return result.orElseThrow(() -> new ResourceNotFoundException("Nie znaleziono zlecenia: " + id));
     }
 
     private String role(UUID userId) {
-        var role = accounts.findById(userId).orElseThrow(() -> new AccessDeniedException("Brak konta użytkownika.")).getRole();
-        if (!"ASSET_OWNER".equals(role) && !"SERVICE_COMPANY".equals(role))
-            throw new AccessDeniedException("Brak dostępu do zleceń.");
-        return role;
+        return accounts.findById(userId).orElseThrow(() -> new AccessDeniedException("Brak konta użytkownika.")).getRole();
     }
 
     private ServiceOrderResponse response(ServiceOrder order) {
@@ -100,5 +105,16 @@ public class ServiceOrderService {
                 location.getId(), location.getName(), location.getAddressLine(), location.getCity(), location.getTimezone(),
                 owner.getId(), owner.getName(), order.getServiceCompany().getId(), order.getOrderType(),
                 order.getDescription(), order.getCurrentStatus(), order.getCreatedByUser().getId(), order.getCreatedAt(), order.getClosedAt());
+    }
+
+    private TechnicianServiceOrderResponse technicianResponse(ServiceOrder order) {
+        var object = order.getServiceObject();
+        var location = object.getLocation();
+        var technician = order.getCoordinatorTechnician();
+        var coordinator = technician == null ? null
+                : new TechnicianServiceOrderResponse.Coordinator(technician.getId(), technician.getDisplayName());
+        return new TechnicianServiceOrderResponse(order.getId(), object.getId(), object.getName(), location.getId(),
+                location.getName(), location.getAddressLine(), location.getCity(), location.getTimezone(),
+                order.getOrderType(), order.getDescription(), order.getCurrentStatus(), order.getCreatedAt(), coordinator);
     }
 }

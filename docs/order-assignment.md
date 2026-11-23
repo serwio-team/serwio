@@ -3,6 +3,8 @@
 Kontrakt backendu. Dotyczy tylko konta `SERVICE_COMPANY` i zleceń własnej firmy.
 Wszystkie żądania wymagają sesji, a `PUT` także tokenu CSRF.
 
+Wpływ przydziałów na widoczność zleceń opisuje [kontrakt API serwisanta](technician-orders.md).
+
 ## Endpointy
 
 | Metoda | Ścieżka | Rola |

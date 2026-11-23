@@ -15,6 +15,7 @@ import { ServiceOrderDetailsPage } from './pages/ServiceOrderDetailsPage';
 import { SignInPage } from './pages/SignInPage';
 import { SignUpPage } from './pages/SignUpPage';
 import { TechnicianDashboardPage } from './pages/TechnicianDashboardPage';
+import { TechnicianOrdersPage } from './pages/TechnicianOrdersPage';
 import { TechniciansPage } from './pages/TechniciansPage';
 import { queryKeys, useCurrentUser } from './queries';
 
@@ -41,6 +42,8 @@ export function App() {
         </Route>
         <Route element={<RequireRole role="TECHNICIAN" />}>
           <Route path="/technician" element={<TechnicianDashboardPage />} />
+          <Route path="/technician/orders" element={<TechnicianOrdersPage />} />
+          <Route path="/technician/orders/:id" element={<ServiceOrderDetailsPage />} />
         </Route>
         <Route element={<RequireRole role="SERVICE_COMPANY" />}>
           <Route path="/company" element={<CompanyDashboardPage />} />
@@ -93,7 +96,7 @@ function RequireRole({ role }: { role?: string }) {
   }
   return (
     <AppLayout user={currentUser.data}>
-      <Outlet />
+      <Outlet context={currentUser.data} />
     </AppLayout>
   );
 }

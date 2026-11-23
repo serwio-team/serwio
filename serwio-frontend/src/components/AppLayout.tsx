@@ -44,7 +44,10 @@ const NAV_BY_ROLE: Record<string, { section: string; items: NavItem[] }> = {
   },
   TECHNICIAN: {
     section: 'Serwisant',
-    items: [{ to: '/technician', label: 'Mój panel', icon: LayoutDashboard }],
+    items: [
+      { to: '/technician', label: 'Mój panel', icon: LayoutDashboard },
+      { to: '/technician/orders', label: 'Moje zlecenia', icon: ClipboardList },
+    ],
   },
 };
 
@@ -77,7 +80,7 @@ export function AppLayout({ user, children }: { user: UserAccountResponse; child
             <NavLink
               key={to}
               to={to}
-              end={to === '/company'}
+              end={to === '/company' || to === '/technician'}
               className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
             >
               <Icon size={16} aria-hidden />

@@ -183,6 +183,7 @@ export type ServiceOrderType = 'REPAIR' | 'INSPECTION';
 
 export type ServiceOrderStatus =
   | 'NEW'
+  | 'ASSIGNED'
   | 'AWAITING_TECHNICIAN_REVIEW'
   | 'AWAITING_OWNER_CONFIRMATION'
   | 'CLOSED'
@@ -223,4 +224,12 @@ export interface ServiceOrderResponse {
   createdByUserId: string;
   createdAt: string;
   closedAt: string | null;
+}
+
+export interface TechnicianServiceOrderResponse extends ServiceOrderListItemResponse {
+  addressLine: string;
+  city: string;
+  timezone: string;
+  description: string;
+  coordinator: { id: string; displayName: string } | null;
 }

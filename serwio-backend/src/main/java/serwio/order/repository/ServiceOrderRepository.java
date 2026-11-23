@@ -43,6 +43,10 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, UUID
     Optional<ServiceOrder> findByIdAndServiceObjectLocationAssetOwnerUserId(UUID id, UUID userId);
     Optional<ServiceOrder> findByIdAndServiceCompanyUserId(UUID id, UUID userId);
 
+    @EntityGraph(attributePaths = {"serviceObject.location", "coordinatorTechnician"})
+    @Query("select o from ServiceOrder o where o.id = :id and " + TECHNICIAN_ACCESS)
+    Optional<ServiceOrder> findByIdForTechnician(UUID id, UUID userId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<ServiceOrder> findForUpdateByIdAndServiceCompanyUserId(UUID id, UUID userId);
 }

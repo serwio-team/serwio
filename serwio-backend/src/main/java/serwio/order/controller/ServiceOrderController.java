@@ -33,7 +33,7 @@ public class ServiceOrderController {
     }
 
     @GetMapping("/{id}")
-    public ServiceOrderResponse get(@PathVariable UUID id) {
+    public ServiceOrderDetailsResponse get(@PathVariable UUID id) {
         return service.get(id);
     }
 }

@@ -15,10 +15,12 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import serwio.visit.dto.ServiceVisitResponse;
 import serwio.visit.dto.ServiceVisitsResponse;
+import serwio.visit.dto.VisitCompletionRequest;
 import serwio.visit.dto.VisitStaffingRequest;
 import serwio.visit.dto.VisitTechnicianResponse;
 import serwio.visit.dto.VisitTimeRange;
 import serwio.visit.service.ServiceVisitService;
+import serwio.visit.service.VisitExecutionService;
 import serwio.visit.service.VisitNegotiationService;
 import serwio.visit.service.VisitStaffingService;
 
@@ -29,6 +31,7 @@ public class ServiceVisitController {
     private final ServiceVisitService visits;
     private final VisitStaffingService staffing;
     private final VisitNegotiationService negotiation;
+    private final VisitExecutionService execution;
 
     @GetMapping
     public ServiceVisitsResponse list(@PathVariable UUID orderId) {
@@ -79,5 +82,16 @@ public class ServiceVisitController {
     @PostMapping("/{visitId}/cancel")
     public ServiceVisitResponse cancel(@PathVariable UUID orderId, @PathVariable UUID visitId) {
         return staffing.cancel(orderId, visitId);
+    }
+
+    @PostMapping("/{visitId}/start")
+    public ServiceVisitResponse start(@PathVariable UUID orderId, @PathVariable UUID visitId) {
+        return execution.start(orderId, visitId);
+    }
+
+    @PostMapping("/{visitId}/complete")
+    public ServiceVisitResponse complete(@PathVariable UUID orderId, @PathVariable UUID visitId,
+                                         @Valid @RequestBody VisitCompletionRequest request) {
+        return execution.complete(orderId, visitId, request.outcome());
     }
 }

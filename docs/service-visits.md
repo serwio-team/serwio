@@ -8,13 +8,17 @@ Kontrakt dla paneli firmy (SCRUM-45), właściciela (SCRUM-46) i serwisanta
 | --- | --- | --- |
 | `GET /visits` | Firma zlecenia, właściciel lokalizacji, serwisant z bieżącym dostępem | `200` z godzinami lokalizacji i wizytami, od najnowszej |
 | `GET /visits/candidates` | Firma zlecenia | `200` z tablicą kandydatów, każdy z `id`, `displayName` i `branchId` |
-| `POST /visits` | Firma zlecenia | `201` ze szczegółami utworzonej wizyty |
+| `POST /visits` | Firma zlecenia | `201` ze szczegółami pierwszej lub kolejnej wizyty |
 | `PUT /visits/{visitId}/staffing` | Firma zlecenia | `200` ze szczegółami wizyty po zmianie obsady |
 | `POST /visits/{visitId}/proposals` | Koordynator wizyty | `200` ze szczegółami wizyty z nową propozycją |
 | `POST /visits/{visitId}/proposals/{proposalId}/counter` | Druga strona uzgodnienia | `200` ze szczegółami wizyty z nową propozycją |
 | `POST /visits/{visitId}/proposals/{proposalId}/reject` | Druga strona uzgodnienia | `200` ze szczegółami wizyty po odrzuceniu |
 | `POST /visits/{visitId}/proposals/{proposalId}/accept` | Druga strona uzgodnienia | `200` ze szczegółami wizyty z potwierdzonym terminem |
 | `POST /visits/{visitId}/cancel` | Firma zlecenia | `200` ze szczegółami anulowanej wizyty |
+| `POST /visits/{visitId}/start` | Koordynator wizyty z bieżącym dostępem | `200` ze stanem `IN_PROGRESS` |
+| `POST /visits/{visitId}/complete` | Koordynator wizyty z bieżącym dostępem | `200` ze stanem `COMPLETED` i wynikiem |
+| `POST /cancel` | Firma zlecenia | `200` ze szczegółami anulowanego zlecenia |
+| `POST /close` | Firma zlecenia | `200` ze szczegółami zamkniętego zlecenia |
 
 ## Odczyt i obsada
 
@@ -38,7 +42,10 @@ zwracają pojedynczą wizytę w tym samym formacie co element `visits`.
       "endsAt": "2026-12-01T10:00:00+01:00"
     },
     "startsAt": null,
-    "endsAt": null
+    "endsAt": null,
+    "startedAt": null,
+    "completedAt": null,
+    "outcome": null
   }]
 }
 ```
@@ -83,14 +90,46 @@ wcześniej potwierdzonych chwil wizyty.
 
 | Zdarzenie | Stan wizyty | Status zlecenia |
 | --- | --- | --- |
-| Utworzenie dla otwartego zlecenia w `ASSIGNED` | `DRAFT` | `AWAITING_SCHEDULING` |
+| Utworzenie dla otwartego zlecenia w `ASSIGNED` lub `REVISIT_REQUIRED` | `DRAFT` | `AWAITING_SCHEDULING` |
 | Akceptacja przez drugą stronę | `CONFIRMED` | `VISIT_CONFIRMED` |
-| Anulowanie szkicu lub potwierdzonej wizyty przed początkiem terminu | `CANCELLED` | `ASSIGNED` |
+| Anulowanie szkicu lub potwierdzonej wizyty przed początkiem terminu | `CANCELLED` | `ASSIGNED` dla pierwszej wizyty albo `REVISIT_REQUIRED` po wizycie wymagającej powrotu |
 
 Zlecenie ma najwyżej jedną niezakończoną wizytę. Po potwierdzeniu obsada,
 koordynator i termin są zablokowane. Zmiana wymaga anulowania i utworzenia
 nowej wizyty z nowym ID. Historia wizyt i propozycji pozostaje zapisana.
-Stany `IN_PROGRESS` i `COMPLETED` są przeznaczone dla realizacji w SCRUM-41.
+
+## Realizacja i wynik wizyty
+
+Koordynator rozpoczyna wizytę w stanie `CONFIRMED`, gdy zlecenie ma status
+`VISIT_CONFIRMED`. `start` nie wymaga treści żądania. Oba stany przechodzą do
+`IN_PROGRESS`. `complete` wymaga rozpoczętej wizyty i przyjmuje wynik:
+
+```json
+{"outcome": "REVISIT_REQUIRED"}
+```
+
+`outcome` przyjmuje `COMPLETED` („Wykonane”) lub `REVISIT_REQUIRED` („Wymaga
+ponownej wizyty”). W obu przypadkach stan wizyty to `COMPLETED`. Status zlecenia
+odpowiada wynikowi. W odpowiedzi i w `GET /visits` pola `startedAt`,
+`completedAt` i `outcome` pojawiają się z wartością `null` przed odpowiednią
+akcją. `startsAt` i `endsAt` nadal opisują uzgodniony termin. Po wyniku
+`REVISIT_REQUIRED` firma może przeplanować obsadę i utworzyć nową wizytę.
+
+## Anulowanie i zamknięcie zlecenia
+
+`POST /cancel` i `POST /close` nie wymagają treści żądania. Anulowanie całego
+zlecenia jest dostępne do faktycznego rozpoczęcia pierwszej wizyty. Anuluje
+również bieżący szkic lub potwierdzoną wizytę i zwalnia jej rezerwację.
+
+Zamknięcie wymaga statusu `COMPLETED`, finalnego raportu (`finalizedAt`)
+i braku niezakończonej wizyty. Szczegóły zlecenia dla firmy i właściciela
+zawierają `reportFinalized`. Obie akcje zapisują `closedAt`, kończą przydziały
+i zachowują wizyty. Dostęp serwisanta do historii wynika z przydziałów i
+członkostwa w oddziale tuż przed `closedAt`.
+
+Finalizacja raportu w SCRUM-42 używa tej samej blokady wiersza zlecenia co
+zamknięcie. Autor musi być w obsadzie co najmniej jednej wizyty w stanie
+`COMPLETED`. Status `COMPLETED` zlecenia dopuszcza finalizację raportu.
 
 ## Błędy
 
@@ -103,5 +142,6 @@ Stany `IN_PROGRESS` i `COMPLETED` są przeznaczone dla realizacji w SCRUM-41.
 | `409` | Konflikt stanu, propozycji lub terminu. `code` rozróżnia przyczynę. |
 
 Kody `409` to `INVALID_VISIT_STATE`, `STALE_PROPOSAL`,
-`OUTSIDE_LOCATION_AVAILABILITY` i `TECHNICIAN_TIME_CONFLICT`.
+`OUTSIDE_LOCATION_AVAILABILITY`, `TECHNICIAN_TIME_CONFLICT`,
+`INVALID_ORDER_STATE` i `REPORT_NOT_FINALIZED`.
 Po `STALE_PROPOSAL` klient pobiera aktualny stan wizyt.

@@ -5,4 +5,5 @@ import serwio.report.model.ServiceReport;
 import java.util.UUID;
 
 public interface ServiceReportRepository extends JpaRepository<ServiceReport, UUID> {
+    boolean existsByServiceOrderIdAndFinalizedAtIsNotNull(UUID serviceOrderId);
 }

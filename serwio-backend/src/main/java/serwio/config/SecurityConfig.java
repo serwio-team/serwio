@@ -32,6 +32,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/register/owner").permitAll()
                         .requestMatchers("/api/csrf").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/service-orders").hasRole("ASSET_OWNER")
+                        .requestMatchers(HttpMethod.POST, "/api/service-orders/*/cancel", "/api/service-orders/*/close")
+                                .hasRole("SERVICE_COMPANY")
                         .requestMatchers(HttpMethod.GET, "/api/service-orders/*/assignment")
                                 .hasRole("SERVICE_COMPANY")
                         .requestMatchers(HttpMethod.PUT, "/api/service-orders/*/assignment")
@@ -47,6 +49,8 @@ public class SecurityConfig {
                                 .hasRole("SERVICE_COMPANY")
                         .requestMatchers(HttpMethod.POST, "/api/service-orders/*/visits/*/proposals")
                                 .hasRole("TECHNICIAN")
+                        .requestMatchers(HttpMethod.POST, "/api/service-orders/*/visits/*/start",
+                                "/api/service-orders/*/visits/*/complete").hasRole("TECHNICIAN")
                         .requestMatchers(HttpMethod.POST, "/api/service-orders/*/visits/*/proposals/*/counter",
                                 "/api/service-orders/*/visits/*/proposals/*/reject",
                                 "/api/service-orders/*/visits/*/proposals/*/accept")

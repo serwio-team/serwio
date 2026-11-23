@@ -21,6 +21,7 @@ import serwio.order.dto.*;
 import serwio.order.model.*;
 import serwio.order.repository.OrderStatusHistoryRepository;
 import serwio.order.repository.ServiceOrderRepository;
+import serwio.report.repository.ServiceReportRepository;
 import serwio.security.CurrentUser;
 
 @Service
@@ -31,6 +32,7 @@ public class ServiceOrderService {
     private final OrderStatusHistoryRepository history;
     private final ServiceObjectRepository objects;
     private final ServiceCompanyRepository companies;
+    private final ServiceReportRepository reports;
     private final UserAccountRepository accounts;
     private final CurrentUser currentUser;
 
@@ -97,14 +99,15 @@ public class ServiceOrderService {
         return accounts.findById(userId).orElseThrow(() -> new AccessDeniedException("Brak konta użytkownika.")).getRole();
     }
 
-    private ServiceOrderResponse response(ServiceOrder order) {
+    ServiceOrderResponse response(ServiceOrder order) {
         var object = order.getServiceObject();
         var location = object.getLocation();
         var owner = location.getAssetOwner();
         return new ServiceOrderResponse(order.getId(), object.getId(), object.getName(),
                 location.getId(), location.getName(), location.getAddressLine(), location.getCity(), location.getTimezone(),
                 owner.getId(), owner.getName(), order.getServiceCompany().getId(), order.getOrderType(),
-                order.getDescription(), order.getCurrentStatus(), order.getCreatedByUser().getId(), order.getCreatedAt(), order.getClosedAt());
+                order.getDescription(), order.getCurrentStatus(), order.getCreatedByUser().getId(), order.getCreatedAt(),
+                order.getClosedAt(), reports.existsByServiceOrderIdAndFinalizedAtIsNotNull(order.getId()));
     }
 
     private TechnicianServiceOrderResponse technicianResponse(ServiceOrder order) {

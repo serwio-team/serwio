@@ -273,6 +273,10 @@ class OrderAssignmentTest {
 
     private UUID createDraft(UUID id, MockHttpSession session, List<UUID> staff, UUID coordinator) throws Exception {
         put(session, body(0, List.of(), staff, coordinator), id).andExpect(status().isOk());
+        return postDraft(id, session, staff, coordinator);
+    }
+
+    private UUID postDraft(UUID id, MockHttpSession session, List<UUID> staff, UUID coordinator) throws Exception {
         var result = visitWrite(post(orderPath(id) + "/visits"), session,
                 Map.of("technicianIds", staff, "coordinatorTechnicianId", coordinator))
                 .andExpect(status().isCreated()).andReturn();
@@ -335,7 +339,8 @@ class OrderAssignmentTest {
         var firmSession = login(companyA);
         var ownerSession = login(owner);
         var coordinatorSession = login(technicianLogin);
-        var visitId = createDraft(orderId, firmSession, List.of(t1.getId(), t2.getId()), t1.getId());
+        put(firmSession, body(0, List.of(a2.getId()), List.of(t1.getId()), t1.getId())).andExpect(status().isOk());
+        var visitId = postDraft(orderId, firmSession, List.of(t1.getId(), t2.getId()), t1.getId());
         var locationId = serviceObject.getLocation().getId();
         setTuesdayHours(ownerSession, locationId, "08:00", "16:00");
         var starts = nextTuesday(9);
@@ -350,12 +355,12 @@ class OrderAssignmentTest {
         mvc.perform(post(acceptance).session(ownerSession).with(csrf())).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("OUTSIDE_LOCATION_AVAILABILITY"));
         setTuesdayHours(ownerSession, locationId, "08:00", "16:00");
-        put(firmSession, body(1, List.of(), List.of(t1.getId()), t1.getId())).andExpect(status().isOk());
+        moveTechnician(firmSession, t2, a1);
         mvc.perform(post(acceptance).session(ownerSession).with(csrf())).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("INVALID_VISIT_STATE"));
         assertThat(proposals.findById(proposalId).orElseThrow().getStatus()).isEqualTo("PENDING");
 
-        put(firmSession, body(2, List.of(), List.of(t1.getId(), t2.getId()), t1.getId())).andExpect(status().isOk());
+        moveTechnician(firmSession, t2, a2);
         mvc.perform(post(acceptance).session(ownerSession).with(csrf())).andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CONFIRMED"))
                 .andExpect(jsonPath("$.currentProposal").value(nullValue()));
@@ -364,7 +369,13 @@ class OrderAssignmentTest {
         assertThat(statusHistory()).containsExactly("ASSIGNED", "AWAITING_SCHEDULING", "VISIT_CONFIRMED");
         mvc.perform(post(acceptance).session(ownerSession).with(csrf())).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("STALE_PROPOSAL"));
-        put(firmSession, body(3, List.of(), List.of(t2.getId()), t2.getId())).andExpect(status().isConflict());
+        put(firmSession, body(1, List.of(), List.of(t2.getId()), t2.getId())).andExpect(status().isConflict());
+    }
+
+    private void moveTechnician(MockHttpSession session, Technician technician, ServiceBranch branch) throws Exception {
+        mvc.perform(putRequest("/api/technicians/" + technician.getId(),
+                Map.of("branchId", branch.getId(), "displayName", technician.getDisplayName(), "active", true))
+                .session(session).with(csrf())).andExpect(status().isOk());
     }
 
     @Test
@@ -400,7 +411,11 @@ class OrderAssignmentTest {
                 .andExpect(status().isCreated()).andReturn();
         var newId = mapper.readTree(newVisit.getResponse().getContentAsString()).get("id").asText();
         assertThat(newId).isNotEqualTo(id.toString());
-        visitWrite(post(visitsPath + "/" + newId + "/proposals"), coordinator, range).andExpect(status().isOk());
+        var draftProposal = visitWrite(post(visitsPath + "/" + newId + "/proposals"), coordinator, range)
+                .andExpect(status().isOk()).andReturn();
+        mvc.perform(post(visitsPath + "/" + newId + "/cancel").session(company).with(csrf()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
+        assertThat(proposals.findById(proposalId(draftProposal)).orElseThrow().getStatus()).isEqualTo("EXPIRED");
     }
 
     @Test
@@ -466,6 +481,80 @@ class OrderAssignmentTest {
     private UUID propose(String path, MockHttpSession coordinator, OffsetDateTime start) throws Exception {
         return proposalId(visitWrite(post(path), coordinator, timeRange(start, start.plusHours(1)))
                 .andExpect(status().isOk()).andReturn());
+    }
+
+    @Test
+    void visitConcurrentAvailabilityEditAndAcceptanceKeepAConsistentResult() throws Exception {
+        var ownerEditing = login(owner);
+        var ownerAccepting = login(owner);
+        var coordinator = login(technicianLogin);
+        var locationId = serviceObject.getLocation().getId();
+        setTuesdayHours(ownerEditing, locationId, "08:00", "16:00");
+        var visit = createDraft(orderId, login(companyA), List.of(t1.getId()), t1.getId());
+        var path = orderPath(orderId) + "/visits/" + visit + "/proposals";
+        var proposal = propose(path, coordinator, nextTuesday(9));
+
+        var results = concurrently(
+                () -> {
+                    setTuesdayHours(ownerEditing, locationId, "12:00", "16:00");
+                    return "updated";
+                },
+                () -> {
+                    var response = mvc.perform(post(path + "/" + proposal + "/accept").session(ownerAccepting).with(csrf()))
+                            .andReturn().getResponse();
+                    if (response.getStatus() == 200) return "confirmed";
+                    assertThat(response.getStatus()).isEqualTo(409);
+                    assertThat(mapper.readTree(response.getContentAsString()).path("code").asText())
+                            .isEqualTo("OUTSIDE_LOCATION_AVAILABILITY");
+                    return "pending";
+                });
+        var confirmed = results.getLast().equals("confirmed");
+        assertThat(proposals.findById(proposal).orElseThrow().getStatus()).isEqualTo(confirmed ? "ACCEPTED" : "PENDING");
+        assertThat(currentStatus()).isEqualTo(confirmed ? "VISIT_CONFIRMED" : "AWAITING_SCHEDULING");
+        if (confirmed) {
+            assertThat(visits.findById(visit).orElseThrow().getStartsAt()).isNotNull();
+        } else {
+            assertThat(visits.findById(visit).orElseThrow().getStartsAt()).isNull();
+        }
+    }
+
+    @Test
+    void visitConcurrentAcceptancesAllowIndependentStaffAndKeepOneResponsePerProposal() throws Exception {
+        var company = login(companyA);
+        var ownerA = login(owner);
+        var ownerB = login(owner);
+        var technicianA = login(technicianLogin);
+        var technicianB = login(t2.getUser());
+        setTuesdayHours(ownerA, serviceObject.getLocation().getId(), "08:00", "16:00");
+        var otherOrder = newOrder(firmA, "NEW", serviceObject).getId();
+        var visitA = createDraft(orderId, company, List.of(t1.getId()), t1.getId());
+        var visitB = createDraft(otherOrder, company, List.of(t2.getId()), t2.getId());
+        var pathA = orderPath(orderId) + "/visits/" + visitA + "/proposals";
+        var pathB = orderPath(otherOrder) + "/visits/" + visitB + "/proposals";
+        var startsAt = nextTuesday(9);
+        var proposalA = propose(pathA, technicianA, startsAt);
+        var initialB = propose(pathB, technicianB, startsAt);
+        var counterB = visitWrite(post(pathB + "/" + initialB + "/counter"), ownerB,
+                timeRange(startsAt, startsAt.plusHours(1))).andExpect(status().isOk()).andReturn();
+        var proposalB = proposalId(counterB);
+
+        var acceptA = pathA + "/" + proposalA + "/accept";
+        var acceptB = pathB + "/" + proposalB + "/accept";
+        assertThat(concurrently(() -> respond(acceptA, ownerA), () -> respond(acceptB, technicianB)))
+                .containsExactly(200, 200);
+
+        var thirdOrder = newOrder(firmA, "NEW", serviceObject).getId();
+        var visitC = createDraft(thirdOrder, company, List.of(t1.getId()), t1.getId());
+        var pathC = orderPath(thirdOrder) + "/visits/" + visitC + "/proposals";
+        var proposalC = propose(pathC, technicianA, startsAt.plusHours(1));
+        var acceptC = pathC + "/" + proposalC + "/accept";
+        assertThat(concurrently(() -> respond(acceptC, ownerA), () -> respond(acceptC, ownerB)))
+                .containsExactlyInAnyOrder(200, 409);
+        assertThat(proposals.findById(proposalC).orElseThrow().getStatus()).isEqualTo("ACCEPTED");
+    }
+
+    private int respond(String path, MockHttpSession client) throws Exception {
+        return mvc.perform(post(path).session(client).with(csrf())).andReturn().getResponse().getStatus();
     }
 
     @Test

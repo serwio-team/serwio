@@ -184,6 +184,8 @@ export type ServiceOrderType = 'REPAIR' | 'INSPECTION';
 export type ServiceOrderStatus =
   | 'NEW'
   | 'ASSIGNED'
+  | 'AWAITING_SCHEDULING'
+  | 'VISIT_CONFIRMED'
   | 'AWAITING_TECHNICIAN_REVIEW'
   | 'AWAITING_OWNER_CONFIRMATION'
   | 'CLOSED'

@@ -20,13 +20,18 @@ export function BranchStatusBadge({ active }: { active: boolean }) {
 const SERVICE_ORDER_STATUS: Record<ServiceOrderStatus, { label: string; tone: string }> = {
   NEW: { label: 'Nowe', tone: 'info' },
   ASSIGNED: { label: 'Przypisane', tone: 'info' },
+  AWAITING_SCHEDULING: { label: 'Uzgadnianie terminu', tone: 'warning' },
+  VISIT_CONFIRMED: { label: 'Wizyta potwierdzona', tone: 'success' },
   AWAITING_TECHNICIAN_REVIEW: { label: 'Oczekuje na serwisanta', tone: 'warning' },
   AWAITING_OWNER_CONFIRMATION: { label: 'Oczekuje na potwierdzenie właściciela', tone: 'warning' },
   CLOSED: { label: 'Zamknięte', tone: 'success' },
   CANCELLED: { label: 'Anulowane', tone: 'neutral' },
 };
 
-export const ACTIVE_ORDER_STATUSES: ServiceOrderStatus[] = ['NEW', 'AWAITING_TECHNICIAN_REVIEW', 'AWAITING_OWNER_CONFIRMATION'];
+export const ACTIVE_ORDER_STATUSES: ServiceOrderStatus[] = [
+  'NEW', 'ASSIGNED', 'AWAITING_SCHEDULING', 'VISIT_CONFIRMED',
+  'AWAITING_TECHNICIAN_REVIEW', 'AWAITING_OWNER_CONFIRMATION',
+];
 
 export const FINISHED_ORDER_STATUSES: ServiceOrderStatus[] = ['CLOSED', 'CANCELLED'];
 

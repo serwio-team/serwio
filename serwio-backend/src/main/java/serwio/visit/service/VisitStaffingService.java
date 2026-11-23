@@ -61,12 +61,7 @@ public class VisitStaffingService {
         technicians.saveAll(staff.stream().map(technician -> membership(visit, technician)).toList());
 
         order.setCurrentStatus(OrderStatus.AWAITING_SCHEDULING.name());
-        var entry = new OrderStatusHistory();
-        entry.setServiceOrder(order);
-        entry.setStatus(order.getCurrentStatus());
-        entry.setChangedByUser(order.getServiceCompany().getUser());
-        entry.setChangedAt(now);
-        history.save(entry);
+        history.save(OrderStatusHistory.forChange(order, order.getServiceCompany().getUser(), now));
         return readService.response(visit, ZoneId.of(order.getServiceObject().getLocation().getTimezone()));
     }
 

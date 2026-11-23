@@ -18,4 +18,7 @@ public interface LocationRepository extends JpaRepository<Location, UUID> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Location> findForUpdateByIdAndAssetOwnerUserId(UUID id, UUID userId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<Location> findForUpdateById(UUID id);
 }

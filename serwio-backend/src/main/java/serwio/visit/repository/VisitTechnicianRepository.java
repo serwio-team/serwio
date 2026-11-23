@@ -14,6 +14,9 @@ public interface VisitTechnicianRepository extends JpaRepository<VisitTechnician
     @EntityGraph(attributePaths = "technician")
     List<VisitTechnician> findAllByVisitIdOrderByTechnicianDisplayNameAscTechnicianIdAsc(UUID visitId);
 
+    @Query("select vt.id.technicianId from VisitTechnician vt where vt.id.visitId = :visitId order by vt.id.technicianId")
+    List<UUID> findTechnicianIds(UUID visitId);
+
     @Query("""
             select count(vt) > 0 from VisitTechnician vt
             where vt.technician.id in :technicianIds and vt.visit.status in :statuses

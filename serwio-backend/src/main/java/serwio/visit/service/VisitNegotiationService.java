@@ -16,6 +16,8 @@ import serwio.exception.ResourceNotFoundException;
 import serwio.location.model.Location;
 import serwio.location.repository.LocationAvailabilityRepository;
 import serwio.order.model.OrderStatus;
+import serwio.order.model.OrderStatusHistory;
+import serwio.order.repository.OrderStatusHistoryRepository;
 import serwio.order.repository.ServiceOrderRepository;
 import serwio.security.CurrentUser;
 import serwio.technician.model.Technician;
@@ -38,6 +40,8 @@ public class VisitNegotiationService {
     private final VisitProposalRepository proposals;
     private final VisitTechnicianRepository technicians;
     private final LocationAvailabilityRepository availability;
+    private final OrderStatusHistoryRepository history;
+    private final VisitReservationLocks reservationLocks;
     private final UserAccountRepository accounts;
     private final CurrentUser currentUser;
     private final ServiceVisitService readService;
@@ -57,7 +61,7 @@ public class VisitNegotiationService {
         var zone = ZoneId.of(location.getTimezone());
         var now = OffsetDateTime.now(ZoneOffset.UTC);
         VisitCalendar.validateRequest(request, zone, now.toInstant());
-        requireAvailable(visit, request, location, zone, now);
+        requireAvailable(visit, request, location, now, technicians.findTechnicianIds(visitId));
         saveProposal(visit, request, coordinator, now);
         return readService.response(visit, zone);
     }
@@ -74,10 +78,30 @@ public class VisitNegotiationService {
         var zone = ZoneId.of(location.getTimezone());
         var now = OffsetDateTime.now(ZoneOffset.UTC);
         VisitCalendar.validateRequest(request, zone, now.toInstant());
-        requireAvailable(reply.visit(), request, location, zone, now);
+        requireAvailable(reply.visit(), request, location, now, technicians.findTechnicianIds(visitId));
         respond(reply, VisitProposalStatus.COUNTERED, now);
         saveProposal(reply.visit(), request, reply.actor(), now);
         return readService.response(reply.visit(), zone);
+    }
+
+    public ServiceVisitResponse accept(UUID orderId, UUID visitId, UUID proposalId) {
+        var reply = prepareReply(orderId, visitId, proposalId);
+        var visit = reply.visit();
+        var locked = reservationLocks.lock(visit);
+        var now = OffsetDateTime.now(ZoneOffset.UTC);
+        var proposal = reply.proposal();
+        var range = new VisitTimeRange(proposal.getProposedStartsAt(), proposal.getProposedEndsAt());
+        requireAvailable(visit, range, locked.location(), now, locked.technicianIds());
+
+        respond(reply, VisitProposalStatus.ACCEPTED, now);
+        visit.setAcceptedProposal(proposal);
+        visit.setStartsAt(range.startsAt());
+        visit.setEndsAt(range.endsAt());
+        visit.setStatus(VisitStatus.CONFIRMED.name());
+        var order = visit.getServiceOrder();
+        order.setCurrentStatus(OrderStatus.VISIT_CONFIRMED.name());
+        history.save(OrderStatusHistory.forChange(order, reply.actor(), now));
+        return readService.response(visit, ZoneId.of(locked.location().getTimezone()));
     }
 
     private Reply prepareReply(UUID orderId, UUID visitId, UUID proposalId) {
@@ -126,16 +150,14 @@ public class VisitNegotiationService {
         }
     }
 
-    private void requireAvailable(ServiceVisit visit, VisitTimeRange range, Location location, ZoneId zone,
-                                  OffsetDateTime now) {
-        var staff = technicians.findAllByVisitIdOrderByTechnicianDisplayNameAscTechnicianIdAsc(visit.getId()).stream()
-                .map(member -> member.getId().getTechnicianId()).toList();
+    private void requireAvailable(ServiceVisit visit, VisitTimeRange range, Location location,
+                                  OffsetDateTime now, List<UUID> staff) {
         var eligible = orders.findEligibleTechnicians(visit.getServiceOrder().getId()).stream()
                 .map(Technician::getId).collect(Collectors.toSet());
         if (!staff.contains(visit.getCoordinatorTechnician().getId()) || !eligible.containsAll(staff)) {
             throw new VisitConflictException("INVALID_VISIT_STATE", "Obsada wizyty nie ma już dostępu do zlecenia.");
         }
-        VisitCalendar.requireAvailable(range, zone,
+        VisitCalendar.requireAvailable(range, ZoneId.of(location.getTimezone()),
                 availability.findAllByLocationIdOrderByDayOfWeekAscAvailableFromAsc(location.getId()), now.toInstant());
         if (technicians.hasOverlap(staff, List.of(VisitStatus.CONFIRMED.name(), VisitStatus.IN_PROGRESS.name()),
                 range.startsAt(), range.endsAt())) {

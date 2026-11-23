@@ -27,6 +27,15 @@ import serwio.account.model.UserAccount;
 @NoArgsConstructor
 public class OrderStatusHistory {
 
+    public static OrderStatusHistory forChange(ServiceOrder order, UserAccount actor, OffsetDateTime changedAt) {
+        var entry = new OrderStatusHistory();
+        entry.setServiceOrder(order);
+        entry.setStatus(order.getCurrentStatus());
+        entry.setChangedByUser(actor);
+        entry.setChangedAt(changedAt);
+        return entry;
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false, unique = false, columnDefinition = "uuid")

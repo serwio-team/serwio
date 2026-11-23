@@ -324,6 +324,43 @@ class OrderAssignmentTest {
     }
 
     @Test
+    void visitAcceptanceRechecksWindowAndStaffThenConfirmsAtomically() throws Exception {
+        var firmSession = login(companyA);
+        var ownerSession = login(owner);
+        var coordinatorSession = login(technicianLogin);
+        var visitId = createDraft(orderId, firmSession, List.of(t1.getId(), t2.getId()), t1.getId());
+        var locationId = serviceObject.getLocation().getId();
+        setTuesdayHours(ownerSession, locationId, "08:00", "16:00");
+        var starts = nextTuesday(9);
+        var path = orderPath(orderId) + "/visits/" + visitId + "/proposals";
+        var proposed = visitWrite(post(path), coordinatorSession, timeRange(starts, starts.plusHours(1)))
+                .andExpect(status().isOk()).andReturn();
+        var proposalId = proposalId(proposed);
+        var acceptance = path + "/" + proposalId + "/accept";
+        mvc.perform(post(acceptance).session(coordinatorSession).with(csrf())).andExpect(status().isForbidden());
+
+        setTuesdayHours(ownerSession, locationId, "12:00", "16:00");
+        mvc.perform(post(acceptance).session(ownerSession).with(csrf())).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("OUTSIDE_LOCATION_AVAILABILITY"));
+        setTuesdayHours(ownerSession, locationId, "08:00", "16:00");
+        put(firmSession, body(1, List.of(), List.of(t1.getId()), t1.getId())).andExpect(status().isOk());
+        mvc.perform(post(acceptance).session(ownerSession).with(csrf())).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_VISIT_STATE"));
+        assertThat(proposals.findById(proposalId).orElseThrow().getStatus()).isEqualTo("PENDING");
+
+        put(firmSession, body(2, List.of(), List.of(t1.getId(), t2.getId()), t1.getId())).andExpect(status().isOk());
+        mvc.perform(post(acceptance).session(ownerSession).with(csrf())).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.currentProposal").value(nullValue()));
+        assertThat(visits.findById(visitId).orElseThrow().getStartsAt().toInstant()).isEqualTo(starts.toInstant());
+        assertThat(proposals.findById(proposalId).orElseThrow().getStatus()).isEqualTo("ACCEPTED");
+        assertThat(statusHistory()).containsExactly("ASSIGNED", "AWAITING_SCHEDULING", "VISIT_CONFIRMED");
+        mvc.perform(post(acceptance).session(ownerSession).with(csrf())).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("STALE_PROPOSAL"));
+        put(firmSession, body(3, List.of(), List.of(t2.getId()), t2.getId())).andExpect(status().isConflict());
+    }
+
+    @Test
     void getReturnsEmptyAssignmentForNewOrder() throws Exception {
         mvc.perform(get(path(orderId)).session(login(companyA))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.serviceOrderId").value(orderId.toString()))

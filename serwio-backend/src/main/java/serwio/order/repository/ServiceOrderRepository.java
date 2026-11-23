@@ -27,6 +27,22 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, UUID
             """;
     String TECHNICIAN_ACCESS = "exists (select 1 from Technician t where t.user.id = :userId and "
             + ELIGIBLE_TECHNICIAN + ")";
+    String TECHNICIAN_READ_ACCESS = "(" + TECHNICIAN_ACCESS + " or " + """
+            (o.closedAt is not null and o.currentStatus in ('CLOSED', 'CANCELLED') and exists (
+                select 1 from Technician t where t.user.id = :userId and t.user.status = 'ACTIVE'
+                    and t.active = true and t.branch.serviceCompany = o.serviceCompany
+                    and (
+                        exists (select 1 from OrderTechnicianAssignment a
+                            where a.serviceOrder = o and a.technician = t and a.assignedAt < o.closedAt
+                                and (a.unassignedAt is null or a.unassignedAt >= o.closedAt))
+                        or exists (select 1 from OrderBranchAssignment a, TechnicianBranchHistory membership
+                            where a.serviceOrder = o and membership.technician = t and membership.branch = a.branch
+                                and a.assignedAt < o.closedAt and (a.unassignedAt is null or a.unassignedAt >= o.closedAt)
+                                and membership.validFrom < o.closedAt
+                                and (membership.validTo is null or membership.validTo >= o.closedAt))
+                    )
+            )))
+            """;
 
     @Query("select t from Technician t, ServiceOrder o where o.id = :orderId and "
             + ELIGIBLE_TECHNICIAN + " order by t.displayName, t.id")
@@ -42,14 +58,14 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, UUID
 
     @EntityGraph(attributePaths = {"serviceObject.location"})
     @Query("select o from ServiceOrder o where (:status is null or o.currentStatus = :status) and "
-            + TECHNICIAN_ACCESS)
+            + TECHNICIAN_READ_ACCESS)
     Page<ServiceOrder> findForTechnician(UUID userId, String status, Pageable pageable);
 
     Optional<ServiceOrder> findByIdAndServiceObjectLocationAssetOwnerUserId(UUID id, UUID userId);
     Optional<ServiceOrder> findByIdAndServiceCompanyUserId(UUID id, UUID userId);
 
     @EntityGraph(attributePaths = {"serviceObject.location", "coordinatorTechnician"})
-    @Query("select o from ServiceOrder o where o.id = :id and " + TECHNICIAN_ACCESS)
+    @Query("select o from ServiceOrder o where o.id = :id and " + TECHNICIAN_READ_ACCESS)
     Optional<ServiceOrder> findByIdForTechnician(UUID id, UUID userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

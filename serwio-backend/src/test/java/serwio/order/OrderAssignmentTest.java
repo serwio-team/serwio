@@ -47,6 +47,8 @@ import serwio.owner.repository.AssetOwnerRepository;
 import serwio.report.model.ServiceReport;
 import serwio.report.repository.ServiceReportRepository;
 import serwio.technician.model.Technician;
+import serwio.technician.model.TechnicianBranchHistory;
+import serwio.technician.repository.TechnicianBranchHistoryRepository;
 import serwio.technician.repository.TechnicianRepository;
 import serwio.visit.model.ServiceVisit;
 import serwio.visit.model.VisitProposal;
@@ -82,6 +84,7 @@ class OrderAssignmentTest {
     @Autowired ServiceCompanyRepository companies;
     @Autowired ServiceBranchRepository branches;
     @Autowired TechnicianRepository technicians;
+    @Autowired TechnicianBranchHistoryRepository branchHistory;
     @Autowired ServiceOrderRepository orders;
     @Autowired ServiceReportRepository reports;
     @Autowired ServiceVisitRepository visits;
@@ -619,6 +622,44 @@ class OrderAssignmentTest {
         assertThat(activeCount("order_technician_assignment")).isZero();
         assertThat(visits.findById(visitId).orElseThrow().getStatus()).isEqualTo("COMPLETED");
         assertThat(statusHistory()).endsWith("IN_PROGRESS", "COMPLETED", "CLOSED");
+        mvc.perform(get(orderPath(orderId)).session(login(technicianLogin))).andExpect(status().isOk());
+    }
+
+    @Test
+    void orderHistoricalAccessUsesAssignmentsAndBranchMembershipAtTermination() throws Exception {
+        var company = login(companyA);
+        var departure = technician(account("TECHNICIAN", "ACTIVE"), a1, "Serwisant przeniesiony", true);
+        var individual = technician(account("TECHNICIAN", "ACTIVE"), a2, "Serwisant przypisany osobiście", true);
+        var removed = technician(account("TECHNICIAN", "ACTIVE"), a2, "Serwisant odpięty", true);
+        var t1Session = login(technicianLogin);
+        var t2Session = login(t2.getUser());
+        var departureSession = login(departure.getUser());
+        var individualSession = login(individual.getUser());
+        var removedSession = login(removed.getUser());
+        var detail = orderPath(orderId);
+        put(company, body(0, List.of(a1.getId()), List.of(individual.getId(), removed.getId()), t1.getId()))
+                .andExpect(status().isOk());
+        postDraft(orderId, company, List.of(t1.getId()), t1.getId());
+        moveTechnician(company, departure, a2);
+        put(company, body(1, List.of(a1.getId()), List.of(individual.getId()), t1.getId())).andExpect(status().isOk());
+        orderAction(orderId, "cancel", company).andExpect(status().isOk());
+        moveTechnician(company, t1, a2);
+        moveTechnician(company, t2, a1);
+
+        for (var authorized : List.of(t1Session, individualSession)) {
+            mvc.perform(get(detail).session(authorized)).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.currentStatus").value("CANCELLED"));
+            mvc.perform(get(detail + "/visits").session(authorized)).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.visits[0].status").value("CANCELLED"));
+            mvc.perform(get(ORDERS_PATH).param("status", "CANCELLED").session(authorized))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$[*].id", contains(orderId.toString())));
+        }
+        for (var unauthorized : List.of(t2Session, departureSession, removedSession)) {
+            mvc.perform(get(detail).session(unauthorized)).andExpect(status().isNotFound());
+            mvc.perform(get(detail + "/visits").session(unauthorized)).andExpect(status().isNotFound());
+            mvc.perform(get(ORDERS_PATH).session(unauthorized)).andExpect(status().isOk())
+                    .andExpect(jsonPath("$").isEmpty());
+        }
     }
 
     private UUID completeFirstVisit(MockHttpSession company) throws Exception {
@@ -1277,7 +1318,14 @@ class OrderAssignmentTest {
         technician.setDisplayName(name);
         technician.setActive(active);
         technician.setCreatedAt(now());
-        return technicians.save(technician);
+        technicians.save(technician);
+        var membership = new TechnicianBranchHistory();
+        membership.setTechnician(technician);
+        membership.setBranch(branch);
+        membership.setChangedByUser(branch.getServiceCompany().getUser());
+        membership.setValidFrom(technician.getCreatedAt());
+        branchHistory.save(membership);
+        return technician;
     }
 
     private ServiceOrder order(ServiceCompany company, String status) {

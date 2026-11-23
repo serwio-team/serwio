@@ -8,13 +8,18 @@ Po przeniesieniu do innego oddziału w tej samej firmie własny aktywny przydzia
 indywidualny nadal działa. Lista i szczegóły odzwierciedlają aktualny stan
 przy następnym żądaniu, także w tej samej sesji.
 
+Zlecenia `CLOSED` i `CANCELLED` są dostępne do odczytu dla aktywnego
+serwisanta na podstawie przydziałów i członkostwa w oddziale bezpośrednio
+przed `closedAt`. Późniejsza zmiana oddziału pozostawia ten dostęp bez
+zmian. Ta sama reguła obowiązuje przy odczycie wizyt.
+
 ## Lista zleceń
 
 `GET /api/service-orders?status=ASSIGNED&page=0&size=20`
 
 | Parametr | Wartość domyślna | Znaczenie |
 | --- | --- | --- |
-| `status` | Brak filtra | `NEW`, `ASSIGNED`, `AWAITING_SCHEDULING`, `VISIT_CONFIRMED`, `AWAITING_TECHNICIAN_REVIEW` lub `AWAITING_OWNER_CONFIRMATION` |
+| `status` | Brak filtra | `NEW`, `ASSIGNED`, `AWAITING_SCHEDULING`, `VISIT_CONFIRMED`, `IN_PROGRESS`, `REVISIT_REQUIRED`, `COMPLETED`, `CLOSED`, `CANCELLED`, `AWAITING_TECHNICIAN_REVIEW` lub `AWAITING_OWNER_CONFIRMATION` |
 | `page` | `0` | Numer strony od zera |
 | `size` | `20` | Rozmiar strony od 1 do 100 |
 

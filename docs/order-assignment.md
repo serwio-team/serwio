@@ -62,7 +62,8 @@ Dla zlecenia bez przydziału: `version: 0`, puste listy, `coordinatorTechnicianI
 - Realna zmiana zestawu lub koordynatora zwiększa `version` o 1. Zdjęte
   przydziały dostają `unassigned_at`, nie są usuwane. Dodane są nowymi wierszami.
 - Zmiana zestawu przy statusie `ASSIGNED` nie dopisuje wpisu historii statusów.
-- Przydział można edytować w statusach `NEW`, `ASSIGNED` i `AWAITING_SCHEDULING`.
+- Przydział można edytować w statusach `NEW`, `ASSIGNED`, `AWAITING_SCHEDULING`
+  i `REVISIT_REQUIRED`.
 - Zdjęcie wszystkich odbiorców nie jest obsługiwane.
 - Każdy zapis sprawdza cały zestaw na nowo. Jeśli oddział lub serwisant z
   aktualnego przydziału został w międzyczasie dezaktywowany, trzeba go usunąć z

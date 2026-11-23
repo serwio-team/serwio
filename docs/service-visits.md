@@ -42,7 +42,10 @@ zwracają pojedynczą wizytę w tym samym formacie co element `visits`.
       "endsAt": "2026-12-01T10:00:00+01:00"
     },
     "startsAt": null,
-    "endsAt": null
+    "endsAt": null,
+    "startedAt": null,
+    "completedAt": null,
+    "outcome": null
   }]
 }
 ```
@@ -119,10 +122,14 @@ zlecenia jest dostępne do faktycznego rozpoczęcia pierwszej wizyty. Anuluje
 również bieżący szkic lub potwierdzoną wizytę i zwalnia jej rezerwację.
 
 Zamknięcie wymaga statusu `COMPLETED`, finalnego raportu (`finalizedAt`)
-i zakończenia wszystkich wizyt. Szczegóły zlecenia dla firmy i właściciela
+i braku niezakończonej wizyty. Szczegóły zlecenia dla firmy i właściciela
 zawierają `reportFinalized`. Obie akcje zapisują `closedAt`, kończą przydziały
 i zachowują wizyty. Dostęp serwisanta do historii wynika z przydziałów i
 członkostwa w oddziale tuż przed `closedAt`.
+
+Finalizacja raportu w SCRUM-42 używa tej samej blokady wiersza zlecenia co
+zamknięcie. Autor musi być w obsadzie co najmniej jednej wizyty w stanie
+`COMPLETED`. Status `COMPLETED` zlecenia dopuszcza finalizację raportu.
 
 ## Błędy
 

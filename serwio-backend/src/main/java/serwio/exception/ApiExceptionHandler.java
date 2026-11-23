@@ -32,7 +32,9 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(ConflictException.class)
     ProblemDetail handleBusinessConflict(ConflictException exception) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+        var problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+        if (exception.getCode() != null) problem.setProperty("code", exception.getCode());
+        return problem;
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

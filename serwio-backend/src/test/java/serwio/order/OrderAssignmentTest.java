@@ -503,6 +503,89 @@ class OrderAssignmentTest {
     }
 
     @Test
+    void orderCancellationEndsAssignmentsAndExpiresProposal() throws Exception {
+        var company = login(companyA);
+        var coordinator = login(technicianLogin);
+        var ownerSession = login(owner);
+        var newOrder = newOrder(firmA, "NEW", serviceObject).getId();
+        orderAction(newOrder, "cancel", company).andExpect(status().isOk());
+        put(company, body(0, List.of(a1.getId()), List.of(t1.getId()), t1.getId())).andExpect(status().isOk());
+        var draft = postDraft(orderId, company, List.of(t1.getId()), t1.getId());
+        setTuesdayHours(ownerSession, serviceObject.getLocation().getId(), "08:00", "16:00");
+        var proposal = propose(orderPath(orderId) + "/visits/" + draft + "/proposals", coordinator, nextTuesday(9));
+
+        orderAction(orderId, "cancel", ownerSession).andExpect(status().isForbidden());
+        orderAction(orderId, "cancel", login(companyB)).andExpect(status().isNotFound());
+        orderAction(orderId, "cancel", company).andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentStatus").value("CANCELLED"))
+                .andExpect(jsonPath("$.closedAt").isString());
+        orderAction(orderId, "cancel", company).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_ORDER_STATE"));
+        assertThat(visits.findById(draft).orElseThrow().getStatus()).isEqualTo("CANCELLED");
+        assertThat(proposals.findById(proposal).orElseThrow().getStatus()).isEqualTo("EXPIRED");
+        var closedAt = orders.findById(orderId).orElseThrow().getClosedAt();
+        for (var table : List.of("order_branch_assignment", "order_technician_assignment")) {
+            assertThat(activeCount(table)).isZero();
+            assertThat(jdbc.queryForList("select unassigned_at from " + table + " where service_order_id = ?",
+                    OffsetDateTime.class, orderId)).isNotEmpty().allMatch(ended -> ended.isEqual(closedAt));
+        }
+        assertThat(statusHistory()).containsExactly("ASSIGNED", "AWAITING_SCHEDULING", "CANCELLED");
+    }
+
+    @Test
+    void orderCancellationReleasesConfirmedReservation() throws Exception {
+        var company = login(companyA);
+        var coordinator = login(technicianLogin);
+        var ownerSession = login(owner);
+        var start = nextTuesday(9);
+        var confirmed = confirmVisit(company, List.of(t1.getId()), t1, start);
+        var otherOrder = newOrder(firmA, "NEW", serviceObject).getId();
+        var draft = createDraft(otherOrder, company, List.of(t1.getId()), t1.getId());
+        var proposalPath = orderPath(otherOrder) + "/visits/" + draft + "/proposals";
+        visitWrite(post(proposalPath), coordinator, timeRange(start, start.plusHours(1)))
+                .andExpect(status().isConflict());
+
+        orderAction(orderId, "cancel", company).andExpect(status().isOk());
+        assertThat(visits.findById(confirmed).orElseThrow().getStatus()).isEqualTo("CANCELLED");
+        var proposal = propose(proposalPath, coordinator, start);
+        mvc.perform(post(proposalPath + "/" + proposal + "/accept").session(ownerSession).with(csrf()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void orderCancellationAndStartingTheVisitCannotBothSucceed() throws Exception {
+        var company = login(companyA);
+        var coordinator = login(technicianLogin);
+        var planned = nextTuesday(9);
+        var visit = confirmVisit(company, List.of(t1.getId()), t1, planned);
+        var visitPath = orderPath(orderId) + "/visits/" + visit;
+        when(visitClock.instant()).thenReturn(planned.toInstant());
+        mvc.perform(post(visitPath + "/cancel").session(company).with(csrf())).andExpect(status().isConflict());
+
+        var codes = concurrently(
+                () -> orderAction(orderId, "cancel", company).andReturn().getResponse().getStatus(),
+                () -> mvc.perform(post(visitPath + "/start").session(coordinator).with(csrf()))
+                        .andReturn().getResponse().getStatus());
+        var stored = visits.findById(visit).orElseThrow();
+        if (codes.getFirst() == 200) {
+            assertThat(codes.getLast()).isIn(404, 409);
+            assertThat(stored.getStatus()).isEqualTo("CANCELLED");
+            assertThat(stored.getStartedAt()).isNull();
+            assertThat(statusHistory()).endsWith("VISIT_CONFIRMED", "CANCELLED");
+        } else {
+            assertThat(codes).containsExactly(409, 200);
+            assertThat(stored.getStatus()).isEqualTo("IN_PROGRESS");
+            assertThat(stored.getStartedAt()).isNotNull();
+            assertThat(statusHistory()).endsWith("VISIT_CONFIRMED", "IN_PROGRESS");
+            orderAction(orderId, "cancel", company).andExpect(status().isConflict());
+        }
+    }
+
+    private ResultActions orderAction(UUID id, String action, MockHttpSession session) throws Exception {
+        return mvc.perform(post(orderPath(id) + "/" + action).session(session).with(csrf()));
+    }
+
+    @Test
     void visitCancellationHonorsStartBoundaryAndReleasesReservation() throws Exception {
         var company = login(companyA);
         var ownerSession = login(owner);

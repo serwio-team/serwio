@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import serwio.order.dto.*;
 import serwio.order.model.OrderStatus;
+import serwio.order.service.OrderTerminationService;
 import serwio.order.service.ServiceOrderService;
 
 @RestController
@@ -18,6 +19,7 @@ import serwio.order.service.ServiceOrderService;
 @RequiredArgsConstructor
 public class ServiceOrderController {
     private final ServiceOrderService service;
+    private final OrderTerminationService termination;
 
     @PostMapping
     public ResponseEntity<ServiceOrderResponse> create(@Valid @RequestBody ServiceOrderRequest request) {
@@ -35,5 +37,10 @@ public class ServiceOrderController {
     @GetMapping("/{id}")
     public ServiceOrderDetailsResponse get(@PathVariable UUID id) {
         return service.get(id);
+    }
+
+    @PostMapping("/{id}/cancel")
+    public ServiceOrderResponse cancel(@PathVariable UUID id) {
+        return termination.cancel(id);
     }
 }

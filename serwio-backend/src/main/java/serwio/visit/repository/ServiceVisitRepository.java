@@ -14,5 +14,9 @@ public interface ServiceVisitRepository extends JpaRepository<ServiceVisit, UUID
 
     boolean existsByServiceOrderIdAndStatusAndOutcome(UUID orderId, String status, VisitOutcome outcome);
 
+    boolean existsByServiceOrderIdAndStartedAtIsNotNull(UUID orderId);
+
+    Optional<ServiceVisit> findByServiceOrderIdAndStatusIn(UUID orderId, List<String> statuses);
+
     Optional<ServiceVisit> findByIdAndServiceOrderId(UUID visitId, UUID orderId);
 }

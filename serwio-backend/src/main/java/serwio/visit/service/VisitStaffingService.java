@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 import serwio.exception.FieldValidationException;
 import serwio.exception.ResourceNotFoundException;
 import serwio.order.model.OrderStatus;
@@ -108,13 +109,26 @@ public class VisitStaffingService {
             throw new VisitConflictException("INVALID_VISIT_STATE", "Potwierdzoną wizytę można anulować przed jej rozpoczęciem.");
         }
 
-        expirePendingProposal(order, visitId, now);
-        visit.setStatus(VisitStatus.CANCELLED.name());
+        markCancelled(visit, now);
         var revisit = visits.existsByServiceOrderIdAndStatusAndOutcome(orderId, VisitStatus.COMPLETED.name(),
                 VisitOutcome.REVISIT_REQUIRED);
         order.setCurrentStatus((revisit ? OrderStatus.REVISIT_REQUIRED : OrderStatus.ASSIGNED).name());
         history.save(OrderStatusHistory.forChange(order, order.getServiceCompany().getUser(), now));
         return readService.response(visit, ZoneId.of(location.getTimezone()));
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void cancelForOrder(ServiceOrder order, OffsetDateTime now) {
+        visits.findByServiceOrderIdAndStatusIn(order.getId(), List.of(VisitStatus.DRAFT.name(), VisitStatus.CONFIRMED.name()))
+                .ifPresent(visit -> {
+                    if (VisitStatus.CONFIRMED.name().equals(visit.getStatus())) reservationLocks.lock(visit);
+                    markCancelled(visit, now);
+                });
+    }
+
+    private void markCancelled(ServiceVisit visit, OffsetDateTime now) {
+        expirePendingProposal(visit.getServiceOrder(), visit.getId(), now);
+        visit.setStatus(VisitStatus.CANCELLED.name());
     }
 
     private void expirePendingProposal(ServiceOrder order, UUID visitId, OffsetDateTime now) {

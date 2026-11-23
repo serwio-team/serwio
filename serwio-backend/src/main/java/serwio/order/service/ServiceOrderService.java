@@ -97,7 +97,7 @@ public class ServiceOrderService {
         return accounts.findById(userId).orElseThrow(() -> new AccessDeniedException("Brak konta użytkownika.")).getRole();
     }
 
-    private ServiceOrderResponse response(ServiceOrder order) {
+    ServiceOrderResponse response(ServiceOrder order) {
         var object = order.getServiceObject();
         var location = object.getLocation();
         var owner = location.getAssetOwner();

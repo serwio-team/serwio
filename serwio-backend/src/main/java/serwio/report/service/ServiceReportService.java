@@ -19,7 +19,9 @@ import serwio.order.model.ServiceOrder;
 import serwio.order.repository.ServiceOrderRepository;
 import serwio.report.dto.ReportDraftRequest;
 import serwio.report.dto.ServiceReportResponse;
+import serwio.report.model.ReportAuthorHistory;
 import serwio.report.model.ServiceReport;
+import serwio.report.repository.ReportAuthorHistoryRepository;
 import serwio.report.repository.ServiceReportRepository;
 import serwio.security.CurrentUser;
 import serwio.technician.model.Technician;
@@ -32,6 +34,7 @@ import serwio.visit.repository.VisitTechnicianRepository;
 public class ServiceReportService {
     private final ServiceOrderRepository orders;
     private final ServiceReportRepository reports;
+    private final ReportAuthorHistoryRepository authorHistory;
     private final UserAccountRepository accounts;
     private final TechnicianRepository technicians;
     private final VisitTechnicianRepository visitTechnicians;
@@ -94,6 +97,35 @@ public class ServiceReportService {
         validateFinalContent(report);
         report.setFinalizedAt(OffsetDateTime.now(clock));
         return ServiceReportResponse.from(report);
+    }
+
+    @Transactional
+    public void assignAuthor(UUID orderId, UUID technicianId) {
+        var userId = currentUser.id();
+        var order = orders.findForUpdateByIdAndServiceCompanyUserId(orderId, userId)
+                .orElseThrow(ServiceReportService::reportNotFound);
+        if (order.getClosedAt() != null) {
+            throw new ConflictException("INVALID_ORDER_STATE", "Zlecenie jest już zakończone.");
+        }
+        var existing = reports.findByServiceOrderId(orderId);
+        existing.ifPresent(ServiceReportService::requireDraft);
+        var candidate = technicians.findForUpdateByIdAndBranchServiceCompanyUserId(technicianId, userId)
+                .filter(technician -> orders.hasCurrentTechnicianAccess(orderId, technician.getUser().getId()))
+                .orElseThrow(() -> invalidAuthor("Wybierz serwisanta z dostępem do zlecenia."));
+        if (!participatedInCompletedVisit(orderId, technicianId)) {
+            throw invalidAuthor("Autor musi być w obsadzie zakończonej wizyty zlecenia.");
+        }
+        var previous = existing.map(ServiceReport::getAuthorTechnician).orElse(null);
+        if (previous != null && previous.getId().equals(technicianId)) return;
+
+        var report = existing.orElseGet(() -> newDraft(order, candidate));
+        report.setAuthorTechnician(candidate);
+        authorHistory.save(new ReportAuthorHistory(reports.save(report), previous, candidate,
+                order.getServiceCompany().getUser(), OffsetDateTime.now(clock)));
+    }
+
+    private static FieldValidationException invalidAuthor(String message) {
+        return new FieldValidationException(Map.of("technicianId", List.of(message)));
     }
 
     private boolean participatedInCompletedVisit(UUID orderId, UUID technicianId) {

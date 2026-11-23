@@ -58,6 +58,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/service-orders/*/report")
                                 .hasAnyRole("ASSET_OWNER", "SERVICE_COMPANY", "TECHNICIAN")
                         .requestMatchers(HttpMethod.PUT, "/api/service-orders/*/report").hasRole("TECHNICIAN")
+                        .requestMatchers(HttpMethod.PUT, "/api/service-orders/*/report/author").hasRole("SERVICE_COMPANY")
                         .requestMatchers(HttpMethod.POST, "/api/service-orders/*/report/finalize")
                                 .hasRole("TECHNICIAN")
                         .requestMatchers(HttpMethod.GET, "/api/service-orders", "/api/service-orders/*")

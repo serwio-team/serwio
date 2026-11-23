@@ -750,6 +750,89 @@ class OrderAssignmentTest {
         visitWrite(post(path + "/complete"), coordinator, Map.of("outcome", outcome)).andExpect(status().isOk());
     }
 
+    @Test
+    void reportAuthorChangePreservesTheDraftAndRecordsWhoChangedIt() throws Exception {
+        var company = login(companyA);
+        var previous = login(technicianLogin);
+        var selected = login(t2.getUser());
+        var planned = nextTuesday(9);
+        var visit = confirmVisit(company, List.of(t2.getId()), t2, planned);
+        recordVisitResult(orderId, visit, selected, "COMPLETED");
+        putReport(previous, validReport()).andExpect(status().isOk());
+        finalizeReportRequest(previous).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REPORT_AUTHOR_NOT_PARTICIPANT"));
+        var reportId = reports.findByServiceOrderId(orderId).orElseThrow().getId();
+
+        assignReportAuthor(previous, t2).andExpect(status().isForbidden());
+        assignReportAuthor(login(companyB), t2).andExpect(status().isNotFound());
+        assignReportAuthor(company, tb1).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.technicianId").isArray());
+        assignReportAuthor(company, t1).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.technicianId").isArray());
+        moveTechnician(company, t2, a1);
+        assignReportAuthor(company, t2).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.technicianId").isArray());
+        assertThat(reportAuthorChanges(reportId)).isZero();
+        moveTechnician(company, t2, a2);
+
+        assignReportAuthor(company, t2).andExpect(status().isNoContent());
+        assignReportAuthor(company, t2).andExpect(status().isNoContent());
+        assertThat(reportAuthorChanges(reportId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select previous_author_technician_id from report_author_history "
+                + "where service_report_id = ?", UUID.class, reportId)).isEqualTo(t1.getId());
+        assertThat(jdbc.queryForObject("select new_author_technician_id from report_author_history "
+                + "where service_report_id = ?", UUID.class, reportId)).isEqualTo(t2.getId());
+        assertThat(jdbc.queryForObject("select changed_by_user_id from report_author_history "
+                + "where service_report_id = ?", UUID.class, reportId)).isEqualTo(companyA.getId());
+        assertThat(jdbc.queryForObject("select changed_at from report_author_history where service_report_id = ?",
+                OffsetDateTime.class, reportId)).isNotNull();
+
+        mvc.perform(get(reportPath(orderId)).session(company)).andExpect(status().isNotFound());
+        mvc.perform(get(reportPath(orderId)).session(previous)).andExpect(status().isNotFound());
+        putReport(previous, Map.of()).andExpect(status().isForbidden());
+        mvc.perform(get(reportPath(orderId)).session(selected)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(reportId.toString()))
+                .andExpect(jsonPath("$.actionsDone").value(validReport().get("actionsDone")));
+        finalizeReportRequest(selected).andExpect(status().isOk());
+        assignReportAuthor(company, t2).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REPORT_ALREADY_FINALIZED"));
+        assertThat(reportAuthorChanges(reportId)).isEqualTo(1);
+    }
+
+    @Test
+    void reportAuthorCanBeSelectedBeforeTheFirstDraftUsingAnEarlierCompletedVisit() throws Exception {
+        var company = login(companyA);
+        var previousCoordinator = login(technicianLogin);
+        var nextCoordinator = login(t2.getUser());
+        var planned = nextTuesday(9);
+        var earlierVisit = confirmVisit(company, List.of(t1.getId()), t1, planned);
+        recordVisitResult(orderId, earlierVisit, previousCoordinator, "REVISIT_REQUIRED");
+        var laterVisit = postDraft(orderId, company, List.of(t2.getId()), t2.getId());
+        confirmDraft(laterVisit, t2, planned.plusHours(2));
+        recordVisitResult(orderId, laterVisit, nextCoordinator, "COMPLETED");
+
+        assertThat(reports.findByServiceOrderId(orderId)).isEmpty();
+        assignReportAuthor(company, t1).andExpect(status().isNoContent());
+        var draft = reports.findByServiceOrderId(orderId).orElseThrow();
+        assertThat(draft.getActionsDone()).isNull();
+        assertThat(reportAuthorChanges(draft.getId())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select previous_author_technician_id from report_author_history "
+                + "where service_report_id = ?", UUID.class, draft.getId())).isNull();
+        putReport(previousCoordinator, validReport()).andExpect(status().isOk());
+        finalizeReportRequest(previousCoordinator).andExpect(status().isOk())
+                .andExpect(jsonPath("$.authorTechnicianId").value(t1.getId().toString()));
+    }
+
+    private ResultActions assignReportAuthor(MockHttpSession session, Technician technician) throws Exception {
+        return mvc.perform(putRequest(reportPath(orderId) + "/author", Map.of("technicianId", technician.getId()))
+                .session(session).with(csrf()));
+    }
+
+    private int reportAuthorChanges(UUID reportId) {
+        return jdbc.queryForObject("select count(*) from report_author_history where service_report_id = ?",
+                Integer.class, reportId);
+    }
+
     private static Map<String, Object> validReport() {
         return Map.of("actionsDone", "Oczyszczono filtr", "diagnosis", "Zabrudzony filtr",
                 "resolution", "Sprawdzono przepływ po czyszczeniu");

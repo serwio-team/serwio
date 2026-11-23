@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend tests and coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: serwio-backend
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: serwio-backend/pom.xml
+      - run: ./mvnw --batch-mode --no-transfer-progress verify
+      - uses: actions/upload-artifact@v6
+        with:
+          name: backend-coverage
+          path: serwio-backend/target/site/jacoco/
+          if-no-files-found: error
+
+  backend-postgres:
+    name: Backend service order flow on PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: serwio_e2e
+          POSTGRES_USER: serwio_e2e
+          POSTGRES_PASSWORD: serwio_e2e
+        ports:
+          - '5432'
+        options: >-
+          --health-cmd "pg_isready -U serwio_e2e -d serwio_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    defaults:
+      run:
+        working-directory: serwio-backend
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: serwio-backend/pom.xml
+      - run: ./mvnw --batch-mode --no-transfer-progress -Dtest=ServiceOrderFlowTest test
+        env:
+          SERWIO_E2E_H2: 'false'
+          SERWIO_E2E_DB_URL: jdbc:postgresql://127.0.0.1:${{ job.services.postgres.ports['5432'] }}/serwio_e2e
+
+  frontend:
+    name: Frontend tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: serwio-frontend
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: serwio-frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build

@@ -379,6 +379,85 @@ class OrderAssignmentTest {
     }
 
     @Test
+    void visitExecutionRecordsActualTimesResultAndOneHistoryEntryPerAction() throws Exception {
+        var company = login(companyA);
+        var coordinator = login(technicianLogin);
+        var planned = nextTuesday(9);
+        var visitId = confirmVisit(company, List.of(t1.getId()), t1, planned);
+        var visitPath = orderPath(orderId) + "/visits/" + visitId;
+        var outcome = Map.of("outcome", "COMPLETED");
+
+        visitWrite(post(visitPath + "/complete"), coordinator, outcome).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_VISIT_STATE"));
+        visitWrite(post(visitPath + "/complete"), coordinator, Map.of()).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.outcome").isArray());
+        visitWrite(post(visitPath + "/complete"), coordinator, Map.of("outcome", "OTHER"))
+                .andExpect(status().isBadRequest());
+
+        var started = planned.plusMinutes(10);
+        when(visitClock.instant()).thenReturn(started.toInstant());
+        mvc.perform(post(visitPath + "/start").session(coordinator).with(csrf()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("IN_PROGRESS"))
+                .andExpect(jsonPath("$.startedAt").isString()).andExpect(jsonPath("$.outcome").value(nullValue()));
+        mvc.perform(post(visitPath + "/start").session(coordinator).with(csrf())).andExpect(status().isConflict());
+        assertThat(currentStatus()).isEqualTo("IN_PROGRESS");
+
+        var completed = started.plusMinutes(20);
+        when(visitClock.instant()).thenReturn(completed.toInstant());
+        visitWrite(post(visitPath + "/complete"), coordinator, outcome).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.outcome").value("COMPLETED"));
+        visitWrite(post(visitPath + "/complete"), coordinator, outcome).andExpect(status().isConflict());
+        mvc.perform(get(orderPath(orderId) + "/visits").session(login(owner))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.visits[0].outcome").value("COMPLETED"));
+        var stored = visits.findById(visitId).orElseThrow();
+        assertThat(stored.getStartsAt().toInstant()).isEqualTo(planned.toInstant());
+        assertThat(stored.getEndsAt().toInstant()).isEqualTo(planned.plusHours(1).toInstant());
+        assertThat(stored.getStartedAt().toInstant()).isEqualTo(started.toInstant());
+        assertThat(stored.getCompletedAt().toInstant()).isEqualTo(completed.toInstant());
+        assertThat(statusHistory()).containsExactly("ASSIGNED", "AWAITING_SCHEDULING", "VISIT_CONFIRMED",
+                "IN_PROGRESS", "COMPLETED");
+    }
+
+    @Test
+    void visitExecutionRequiresTheVisitCoordinatorWithCurrentAccess() throws Exception {
+        var company = login(companyA);
+        var coordinator = login(t2.getUser());
+        var visitId = confirmVisit(company, List.of(t1.getId(), t2.getId()), t2, nextTuesday(9));
+        var startPath = orderPath(orderId) + "/visits/" + visitId + "/start";
+
+        mvc.perform(post(startPath).with(csrf())).andExpect(status().isUnauthorized());
+        mvc.perform(post(startPath).session(coordinator)).andExpect(status().isForbidden());
+        for (var user : List.of(owner, companyA, technicianLogin)) {
+            mvc.perform(post(startPath).session(login(user)).with(csrf())).andExpect(status().isForbidden());
+        }
+        var otherOrderId = newOrder(firmA, "NEW", serviceObject).getId();
+        put(company, body(0, List.of(a2.getId()), List.of(), t2.getId()), otherOrderId).andExpect(status().isOk());
+        mvc.perform(post(orderPath(otherOrderId) + "/visits/" + visitId + "/start")
+                .session(coordinator).with(csrf())).andExpect(status().isNotFound());
+        moveTechnician(company, t2, a1);
+        mvc.perform(post(startPath).session(coordinator).with(csrf())).andExpect(status().isNotFound());
+        assertThat(currentStatus()).isEqualTo("VISIT_CONFIRMED");
+    }
+
+    private UUID confirmVisit(MockHttpSession company, List<UUID> staff, Technician coordinator,
+                              OffsetDateTime planned) throws Exception {
+        put(company, body(0, List.of(a2.getId()), List.of(t1.getId()), t1.getId())).andExpect(status().isOk());
+        var visitId = postDraft(orderId, company, staff, coordinator.getId());
+        confirmDraft(visitId, coordinator, planned);
+        return visitId;
+    }
+
+    private void confirmDraft(UUID visitId, Technician coordinator, OffsetDateTime planned) throws Exception {
+        var ownerSession = login(owner);
+        setTuesdayHours(ownerSession, serviceObject.getLocation().getId(), "08:00", "16:00");
+        var path = orderPath(orderId) + "/visits/" + visitId + "/proposals";
+        var proposal = propose(path, login(coordinator.getUser()), planned);
+        mvc.perform(post(path + "/" + proposal + "/accept").session(ownerSession).with(csrf()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void visitCancellationHonorsStartBoundaryAndReleasesReservation() throws Exception {
         var company = login(companyA);
         var ownerSession = login(owner);

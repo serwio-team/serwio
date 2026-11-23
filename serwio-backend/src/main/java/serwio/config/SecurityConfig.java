@@ -47,6 +47,8 @@ public class SecurityConfig {
                                 .hasRole("SERVICE_COMPANY")
                         .requestMatchers(HttpMethod.POST, "/api/service-orders/*/visits/*/proposals")
                                 .hasRole("TECHNICIAN")
+                        .requestMatchers(HttpMethod.POST, "/api/service-orders/*/visits/*/start",
+                                "/api/service-orders/*/visits/*/complete").hasRole("TECHNICIAN")
                         .requestMatchers(HttpMethod.POST, "/api/service-orders/*/visits/*/proposals/*/counter",
                                 "/api/service-orders/*/visits/*/proposals/*/reject",
                                 "/api/service-orders/*/visits/*/proposals/*/accept")

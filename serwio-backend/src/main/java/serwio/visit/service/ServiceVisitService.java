@@ -68,7 +68,8 @@ public class ServiceVisitService {
                         inZone(p.getProposedStartsAt(), zone), inZone(p.getProposedEndsAt(), zone)))
                 .orElse(null);
         return new ServiceVisitResponse(visit.getId(), visit.getStatus(), visit.getCoordinatorTechnician().getId(),
-                staff, proposal, inZone(visit.getStartsAt(), zone), inZone(visit.getEndsAt(), zone));
+                staff, proposal, inZone(visit.getStartsAt(), zone), inZone(visit.getEndsAt(), zone),
+                inZone(visit.getStartedAt(), zone), inZone(visit.getCompletedAt(), zone), visit.getOutcome());
     }
 
     private static OffsetDateTime inZone(OffsetDateTime time, ZoneId zone) {

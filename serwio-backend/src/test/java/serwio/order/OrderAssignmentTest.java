@@ -662,6 +662,64 @@ class OrderAssignmentTest {
         }
     }
 
+    @Test
+    void visitConcurrentCompletionAndRepeatDraftsKeepOneOutcomeAndOneActiveVisit() throws Exception {
+        var company = login(companyA);
+        var firstCoordinator = login(technicianLogin);
+        var secondCoordinator = login(technicianLogin);
+        var planned = nextTuesday(9);
+        var visitId = confirmVisit(company, List.of(t1.getId()), t1, planned);
+        var path = orderPath(orderId) + "/visits";
+        when(visitClock.instant()).thenReturn(planned.toInstant());
+        mvc.perform(post(path + "/" + visitId + "/start").session(firstCoordinator).with(csrf()))
+                .andExpect(status().isOk());
+        when(visitClock.instant()).thenReturn(planned.plusMinutes(30).toInstant());
+        var outcome = Map.of("outcome", "REVISIT_REQUIRED");
+        var completion = path + "/" + visitId + "/complete";
+        assertThat(concurrently(
+                () -> visitWrite(post(completion), firstCoordinator, outcome).andReturn().getResponse().getStatus(),
+                () -> visitWrite(post(completion), secondCoordinator, outcome).andReturn().getResponse().getStatus()))
+                .containsExactlyInAnyOrder(200, 409);
+        assertThat(statusHistory()).endsWith("IN_PROGRESS", "REVISIT_REQUIRED");
+
+        var secondCompanySession = login(companyA);
+        var staffing = Map.of("technicianIds", List.of(t1.getId()), "coordinatorTechnicianId", t1.getId());
+        when(visitClock.instant()).thenReturn(planned.plusMinutes(35).toInstant());
+        assertThat(concurrently(
+                () -> visitWrite(post(path), company, staffing).andReturn().getResponse().getStatus(),
+                () -> visitWrite(post(path), secondCompanySession, staffing).andReturn().getResponse().getStatus()))
+                .containsExactlyInAnyOrder(201, 409);
+        assertThat(visits.findAllByServiceOrderIdOrderByCreatedAtDescIdAsc(orderId))
+                .extracting(ServiceVisit::getStatus).containsExactly("DRAFT", "COMPLETED");
+        assertThat(statusHistory()).endsWith("IN_PROGRESS", "REVISIT_REQUIRED", "AWAITING_SCHEDULING");
+    }
+
+    @Test
+    void orderClosingRaceUsesCommittedReportAndAppendsOneTerminalHistoryEntry() throws Exception {
+        var company = login(companyA);
+        completeFirstVisit(company);
+        var draft = createDraftReport();
+        var codes = concurrently(
+                () -> orderAction(orderId, "close", company).andReturn().getResponse().getStatus(),
+                () -> new TransactionTemplate(transactionManager).execute(status -> {
+                    // Finalization and closing share the order lock.
+                    orders.findForUpdateByIdAndServiceCompanyUserId(orderId, companyA.getId()).orElseThrow();
+                    finalizeReport(draft);
+                    return 200;
+                }));
+        assertThat(codes.getLast()).isEqualTo(200);
+        assertThat(reports.existsByServiceOrderIdAndFinalizedAtIsNotNull(orderId)).isTrue();
+        if (codes.getFirst() == 409) {
+            assertThat(currentStatus()).isEqualTo("COMPLETED");
+            orderAction(orderId, "close", company).andExpect(status().isOk());
+        } else {
+            assertThat(codes.getFirst()).isEqualTo(200);
+        }
+        assertThat(currentStatus()).isEqualTo("CLOSED");
+        assertThat(statusHistory()).containsExactly("ASSIGNED", "AWAITING_SCHEDULING", "VISIT_CONFIRMED",
+                "IN_PROGRESS", "COMPLETED", "CLOSED");
+    }
+
     private UUID completeFirstVisit(MockHttpSession company) throws Exception {
         var coordinator = login(technicianLogin);
         var planned = nextTuesday(9);

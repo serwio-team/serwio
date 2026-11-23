@@ -163,6 +163,45 @@ class OrderAssignmentTest {
     }
 
     @Test
+    void visitCreateValidatesStaffAndRecordsOneDraftAndTransition() throws Exception {
+        var firmSession = login(companyA);
+        var visitsPath = orderPath(orderId) + "/visits";
+        var selected = Map.of("technicianIds", List.of(t1.getId()), "coordinatorTechnicianId", t1.getId());
+        visitWrite(post(visitsPath), firmSession, selected).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_VISIT_STATE"));
+        put(firmSession, body(0, List.of(a1.getId()), List.of(), t1.getId())).andExpect(status().isOk());
+
+        visitWrite(post(visitsPath), firmSession,
+                Map.of("technicianIds", List.of(t1.getId(), t1.getId()), "coordinatorTechnicianId", t1.getId()))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors.technicianIds").isArray());
+        visitWrite(post(visitsPath), firmSession,
+                Map.of("technicianIds", List.of(t1.getId()), "coordinatorTechnicianId", t2.getId()))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors.coordinatorTechnicianId").isArray());
+        visitWrite(post(visitsPath), firmSession,
+                Map.of("technicianIds", List.of(t2.getId()), "coordinatorTechnicianId", t2.getId()))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors.technicianIds").isArray());
+        visitWrite(post(visitsPath), login(owner), selected).andExpect(status().isForbidden());
+        visitWrite(post(visitsPath), login(companyB), selected).andExpect(status().isNotFound());
+
+        visitWrite(post(visitsPath), firmSession, selected).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("DRAFT"))
+                .andExpect(jsonPath("$.technicians[*].id", contains(t1.getId().toString())));
+        visitWrite(post(visitsPath), firmSession, selected).andExpect(status().isConflict());
+        mvc.perform(get(visitsPath).session(firmSession)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.visits.length()").value(1));
+        assertThat(currentStatus()).isEqualTo("AWAITING_SCHEDULING");
+        assertThat(statusHistory()).containsExactly("ASSIGNED", "AWAITING_SCHEDULING");
+        put(firmSession, body(1, List.of(a1.getId(), a2.getId()), List.of(), t1.getId())).andExpect(status().isOk());
+        assertThat(currentStatus()).isEqualTo("AWAITING_SCHEDULING");
+    }
+
+    private ResultActions visitWrite(org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder request,
+                                     MockHttpSession session, Map<String, ?> body) throws Exception {
+        return mvc.perform(request.session(session).with(csrf()).contentType("application/json")
+                .content(mapper.writeValueAsString(body)));
+    }
+
+    @Test
     void getReturnsEmptyAssignmentForNewOrder() throws Exception {
         mvc.perform(get(path(orderId)).session(login(companyA))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.serviceOrderId").value(orderId.toString()))

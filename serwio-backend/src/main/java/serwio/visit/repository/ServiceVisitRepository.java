@@ -7,4 +7,6 @@ import java.util.UUID;
 
 public interface ServiceVisitRepository extends JpaRepository<ServiceVisit, UUID> {
     List<ServiceVisit> findAllByServiceOrderIdOrderByCreatedAtDescIdAsc(UUID orderId);
+
+    boolean existsByServiceOrderIdAndStatusNotIn(UUID orderId, List<String> statuses);
 }

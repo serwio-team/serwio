@@ -58,8 +58,9 @@ public class OrderAssignmentService {
         var order = orders.findForUpdateByIdAndServiceCompanyUserId(orderId, userId)
                 .orElseThrow(() -> notFound(orderId));
         var status = order.getCurrentStatus();
-        if (!OrderStatus.NEW.name().equals(status) && !OrderStatus.ASSIGNED.name().equals(status)) {
-            throw new ConflictException("Przydział można zmieniać tylko dla zleceń nowych lub przypisanych.");
+        if (!OrderStatus.NEW.name().equals(status) && !OrderStatus.ASSIGNED.name().equals(status)
+                && !OrderStatus.AWAITING_SCHEDULING.name().equals(status)) {
+            throw new ConflictException("Przydział można zmienić przed potwierdzeniem terminu wizyty.");
         }
         if (!request.expectedVersion().equals(order.getAssignmentVersion())) {
             throw new ConflictException("Przydział został zmieniony. Odśwież dane i spróbuj ponownie.");

@@ -17,6 +17,7 @@ import serwio.visit.dto.ServiceVisitResponse;
 import serwio.visit.dto.ServiceVisitsResponse;
 import serwio.visit.dto.VisitTechnicianResponse;
 import serwio.visit.model.ServiceVisit;
+import serwio.visit.model.VisitProposalStatus;
 import serwio.visit.model.VisitTechnician;
 import serwio.visit.repository.ServiceVisitRepository;
 import serwio.visit.repository.VisitProposalRepository;
@@ -60,7 +61,8 @@ public class ServiceVisitService {
     ServiceVisitResponse response(ServiceVisit visit, ZoneId zone) {
         var staff = technicians.findAllByVisitIdOrderByTechnicianDisplayNameAscTechnicianIdAsc(visit.getId())
                 .stream().map(VisitTechnician::getTechnician).map(VisitTechnicianResponse::from).toList();
-        var proposal = proposals.findFirstByVisitIdAndStatusOrderByCreatedAtDescIdAsc(visit.getId(), "PENDING")
+        var proposal = proposals.findFirstByVisitIdAndStatusOrderByCreatedAtDescIdAsc(
+                        visit.getId(), VisitProposalStatus.PENDING.name())
                 .map(p -> new ServiceVisitResponse.Proposal(p.getId(),
                         "ASSET_OWNER".equals(p.getProposedByUser().getRole()) ? "OWNER" : "COORDINATOR",
                         inZone(p.getProposedStartsAt(), zone), inZone(p.getProposedEndsAt(), zone)))

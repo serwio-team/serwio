@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,10 +23,12 @@ import serwio.technician.model.Technician;
 import serwio.visit.dto.ServiceVisitResponse;
 import serwio.visit.dto.VisitStaffingRequest;
 import serwio.visit.model.ServiceVisit;
+import serwio.visit.model.VisitProposalStatus;
 import serwio.visit.model.VisitStatus;
 import serwio.visit.model.VisitTechnician;
 import serwio.visit.model.VisitTechnicianId;
 import serwio.visit.repository.ServiceVisitRepository;
+import serwio.visit.repository.VisitProposalRepository;
 import serwio.visit.repository.VisitTechnicianRepository;
 
 @Service
@@ -34,6 +37,7 @@ public class VisitStaffingService {
     private final ServiceOrderRepository orders;
     private final ServiceVisitRepository visits;
     private final VisitTechnicianRepository technicians;
+    private final VisitProposalRepository proposals;
     private final OrderStatusHistoryRepository history;
     private final CurrentUser currentUser;
     private final ServiceVisitService readService;
@@ -64,6 +68,37 @@ public class VisitStaffingService {
         entry.setChangedAt(now);
         history.save(entry);
         return readService.response(visit, ZoneId.of(order.getServiceObject().getLocation().getTimezone()));
+    }
+
+    @Transactional
+    public ServiceVisitResponse replace(UUID orderId, UUID visitId, VisitStaffingRequest request) {
+        var order = lockCompanyOrder(orderId);
+        var visit = visits.findByIdAndServiceOrderId(visitId, orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Nie znaleziono wizyty: " + visitId));
+        if (order.getClosedAt() != null || !VisitStatus.DRAFT.name().equals(visit.getStatus())) {
+            throw new VisitConflictException("INVALID_VISIT_STATE", "Obsadę można zmienić podczas uzgadniania terminu.");
+        }
+        var staff = validateStaff(orderId, request);
+        var previous = technicians.findAllByVisitIdOrderByTechnicianDisplayNameAscTechnicianIdAsc(visitId);
+        var before = previous.stream().map(member -> member.getId().getTechnicianId()).collect(Collectors.toSet());
+        var after = new HashSet<>(request.technicianIds());
+        if (!before.equals(after) || !visit.getCoordinatorTechnician().getId().equals(request.coordinatorTechnicianId())) {
+            technicians.deleteAll(previous.stream().filter(member -> !after.contains(member.getId().getTechnicianId())).toList());
+            technicians.saveAll(staff.stream().filter(member -> !before.contains(member.getId()))
+                    .map(member -> membership(visit, member)).toList());
+            visit.setCoordinatorTechnician(coordinator(staff, request.coordinatorTechnicianId()));
+            expirePendingProposal(order, visitId);
+        }
+        return readService.response(visit, ZoneId.of(order.getServiceObject().getLocation().getTimezone()));
+    }
+
+    private void expirePendingProposal(ServiceOrder order, UUID visitId) {
+        proposals.findFirstByVisitIdAndStatusOrderByCreatedAtDescIdAsc(visitId, VisitProposalStatus.PENDING.name())
+                .ifPresent(proposal -> {
+                    proposal.setStatus(VisitProposalStatus.EXPIRED.name());
+                    proposal.setRespondedByUser(order.getServiceCompany().getUser());
+                    proposal.setRespondedAt(OffsetDateTime.now(ZoneOffset.UTC));
+                });
     }
 
     private ServiceOrder lockCompanyOrder(UUID orderId) {

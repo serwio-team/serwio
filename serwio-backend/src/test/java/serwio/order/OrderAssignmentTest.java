@@ -40,7 +40,9 @@ import serwio.owner.repository.AssetOwnerRepository;
 import serwio.technician.model.Technician;
 import serwio.technician.repository.TechnicianRepository;
 import serwio.visit.model.ServiceVisit;
+import serwio.visit.model.VisitProposal;
 import serwio.visit.repository.ServiceVisitRepository;
+import serwio.visit.repository.VisitProposalRepository;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -72,6 +74,7 @@ class OrderAssignmentTest {
     @Autowired TechnicianRepository technicians;
     @Autowired ServiceOrderRepository orders;
     @Autowired ServiceVisitRepository visits;
+    @Autowired VisitProposalRepository proposals;
 
     /** Firma A z dwoma aktywnymi i jednym nieaktywnym oddziałem, firma B z jednym oddziałem. */
     UserAccount companyA, companyB, owner, technicianLogin;
@@ -199,6 +202,38 @@ class OrderAssignmentTest {
                                      MockHttpSession session, Map<String, ?> body) throws Exception {
         return mvc.perform(request.session(session).with(csrf()).contentType("application/json")
                 .content(mapper.writeValueAsString(body)));
+    }
+
+    @Test
+    void visitStaffingChangeExpiresPendingProposalAndPreservesItsHistory() throws Exception {
+        var firmSession = login(companyA);
+        var visitsPath = orderPath(orderId) + "/visits";
+        put(firmSession, body(0, List.of(a1.getId(), a2.getId()), List.of(), t1.getId())).andExpect(status().isOk());
+        var firstStaff = Map.of("technicianIds", List.of(t1.getId()), "coordinatorTechnicianId", t1.getId());
+        var created = visitWrite(post(visitsPath), firmSession, firstStaff).andExpect(status().isCreated()).andReturn();
+        var visitId = UUID.fromString(mapper.readTree(created.getResponse().getContentAsString()).get("id").asText());
+        var proposal = new VisitProposal();
+        proposal.setVisit(visits.findById(visitId).orElseThrow());
+        proposal.setProposedByUser(technicianLogin);
+        proposal.setProposedStartsAt(now().plusDays(1));
+        proposal.setProposedEndsAt(proposal.getProposedStartsAt().plusHours(1));
+        proposal.setCreatedAt(now());
+        proposal.setStatus("PENDING");
+        proposals.save(proposal);
+
+        var path = visitsPath + "/" + visitId + "/staffing";
+        visitWrite(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(path), firmSession, firstStaff)
+                .andExpect(status().isOk()).andExpect(jsonPath("$.currentProposal.id").value(proposal.getId().toString()));
+        var newStaff = Map.of("technicianIds", List.of(t2.getId()), "coordinatorTechnicianId", t2.getId());
+        visitWrite(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(path), firmSession, newStaff)
+                .andExpect(status().isOk()).andExpect(jsonPath("$.technicians[*].id", contains(t2.getId().toString())))
+                .andExpect(jsonPath("$.coordinatorTechnicianId").value(t2.getId().toString()))
+                .andExpect(jsonPath("$.currentProposal").value(nullValue()));
+        assertThat(proposals.findById(proposal.getId()).orElseThrow().getStatus()).isEqualTo("EXPIRED");
+        var anotherOrder = newOrder(firmA, "ASSIGNED", serviceObject);
+        visitWrite(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                orderPath(anotherOrder.getId()) + "/visits/" + visitId + "/staffing"), firmSession, firstStaff)
+                .andExpect(status().isNotFound());
     }
 
     @Test

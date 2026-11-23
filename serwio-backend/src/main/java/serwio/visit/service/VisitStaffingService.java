@@ -23,6 +23,7 @@ import serwio.technician.model.Technician;
 import serwio.visit.dto.ServiceVisitResponse;
 import serwio.visit.dto.VisitStaffingRequest;
 import serwio.visit.model.ServiceVisit;
+import serwio.visit.model.VisitOutcome;
 import serwio.visit.model.VisitProposalStatus;
 import serwio.visit.model.VisitStatus;
 import serwio.visit.model.VisitTechnician;
@@ -47,7 +48,9 @@ public class VisitStaffingService {
     @Transactional
     public ServiceVisitResponse create(UUID orderId, VisitStaffingRequest request) {
         var order = lockCompanyOrder(orderId);
-        if (order.getClosedAt() != null || !OrderStatus.ASSIGNED.name().equals(order.getCurrentStatus())
+        var status = order.getCurrentStatus();
+        if (order.getClosedAt() != null
+                || (!OrderStatus.ASSIGNED.name().equals(status) && !OrderStatus.REVISIT_REQUIRED.name().equals(status))
                 || visits.existsByServiceOrderIdAndStatusNotIn(orderId, List.of(
                         VisitStatus.CANCELLED.name(), VisitStatus.COMPLETED.name()))) {
             throw new VisitConflictException("INVALID_VISIT_STATE", "Nie można utworzyć wizyty dla tego zlecenia.");
@@ -107,7 +110,9 @@ public class VisitStaffingService {
 
         expirePendingProposal(order, visitId, now);
         visit.setStatus(VisitStatus.CANCELLED.name());
-        order.setCurrentStatus(OrderStatus.ASSIGNED.name());
+        var revisit = visits.existsByServiceOrderIdAndStatusAndOutcome(orderId, VisitStatus.COMPLETED.name(),
+                VisitOutcome.REVISIT_REQUIRED);
+        order.setCurrentStatus((revisit ? OrderStatus.REVISIT_REQUIRED : OrderStatus.ASSIGNED).name());
         history.save(OrderStatusHistory.forChange(order, order.getServiceCompany().getUser(), now));
         return readService.response(visit, ZoneId.of(location.getTimezone()));
     }

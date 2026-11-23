@@ -59,6 +59,7 @@ public class OrderAssignmentService {
                 .orElseThrow(() -> notFound(orderId));
         var status = order.getCurrentStatus();
         if (!OrderStatus.NEW.name().equals(status) && !OrderStatus.ASSIGNED.name().equals(status)
+                && !OrderStatus.REVISIT_REQUIRED.name().equals(status)
                 && !OrderStatus.AWAITING_SCHEDULING.name().equals(status)) {
             throw new ConflictException("Przydział można zmienić przed potwierdzeniem terminu wizyty.");
         }

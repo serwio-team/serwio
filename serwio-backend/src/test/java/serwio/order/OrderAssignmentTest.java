@@ -417,6 +417,9 @@ class OrderAssignmentTest {
         assertThat(stored.getCompletedAt().toInstant()).isEqualTo(completed.toInstant());
         assertThat(statusHistory()).containsExactly("ASSIGNED", "AWAITING_SCHEDULING", "VISIT_CONFIRMED",
                 "IN_PROGRESS", "COMPLETED");
+        visitWrite(post(orderPath(orderId) + "/visits"), company,
+                Map.of("technicianIds", List.of(t1.getId()), "coordinatorTechnicianId", t1.getId()))
+                .andExpect(status().isConflict());
     }
 
     @Test
@@ -455,6 +458,48 @@ class OrderAssignmentTest {
         var proposal = propose(path, login(coordinator.getUser()), planned);
         mvc.perform(post(path + "/" + proposal + "/accept").session(ownerSession).with(csrf()))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void visitRevisitAllowsNewStaffAndRestoresRevisitStateWhenReplacementIsCancelled() throws Exception {
+        var company = login(companyA);
+        var firstCoordinator = login(technicianLogin);
+        var firstStart = nextTuesday(9);
+        var firstVisit = confirmVisit(company, List.of(t1.getId()), t1, firstStart);
+        var base = orderPath(orderId) + "/visits/";
+        when(visitClock.instant()).thenReturn(firstStart.toInstant());
+        mvc.perform(post(base + firstVisit + "/start").session(firstCoordinator).with(csrf()))
+                .andExpect(status().isOk());
+        when(visitClock.instant()).thenReturn(firstStart.plusMinutes(30).toInstant());
+        visitWrite(post(base + firstVisit + "/complete"), firstCoordinator, Map.of("outcome", "REVISIT_REQUIRED"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.outcome").value("REVISIT_REQUIRED"));
+        assertThat(currentStatus()).isEqualTo("REVISIT_REQUIRED");
+
+        put(company, body(1, List.of(), List.of(t2.getId()), t2.getId())).andExpect(status().isOk());
+        var cancelledReplacement = postDraft(orderId, company, List.of(t2.getId()), t2.getId());
+        mvc.perform(post(base + cancelledReplacement + "/cancel").session(company).with(csrf()))
+                .andExpect(status().isOk());
+        assertThat(currentStatus()).isEqualTo("REVISIT_REQUIRED");
+        var replacement = postDraft(orderId, company, List.of(t2.getId()), t2.getId());
+        var replacementStart = firstStart.plusHours(3);
+        confirmDraft(replacement, t2, replacementStart);
+
+        var nextCoordinator = login(t2.getUser());
+        when(visitClock.instant()).thenReturn(replacementStart.toInstant());
+        mvc.perform(post(base + replacement + "/start").session(nextCoordinator).with(csrf()))
+                .andExpect(status().isOk());
+        when(visitClock.instant()).thenReturn(replacementStart.plusMinutes(45).toInstant());
+        visitWrite(post(base + replacement + "/complete"), nextCoordinator, Map.of("outcome", "COMPLETED"))
+                .andExpect(status().isOk());
+        assertThat(currentStatus()).isEqualTo("COMPLETED");
+        assertThat(visits.findAllByServiceOrderIdOrderByCreatedAtDescIdAsc(orderId)).hasSize(3);
+        mvc.perform(get(orderPath(orderId) + "/visits").session(company)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.visits[?(@.id == '%s')].outcome".formatted(firstVisit),
+                        contains("REVISIT_REQUIRED")))
+                .andExpect(jsonPath("$.visits[?(@.id == '%s')].coordinatorTechnicianId".formatted(firstVisit),
+                        contains(t1.getId().toString())));
+        assertThat(visits.findById(firstVisit).orElseThrow().getStartsAt().toInstant()).isEqualTo(firstStart.toInstant());
     }
 
     @Test

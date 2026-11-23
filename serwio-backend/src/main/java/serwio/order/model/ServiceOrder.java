@@ -71,6 +71,10 @@ public class ServiceOrder {
     @Size(max = 64)
     private String currentStatus;
 
+    @Column(name = "assignment_version", nullable = false, unique = false, columnDefinition = "bigint default 0")
+    @NotNull
+    private Long assignmentVersion = 0L;
+
     @Column(name = "created_at", nullable = false, unique = false, columnDefinition = "timestamp with time zone")
     @NotNull
     private OffsetDateTime createdAt;

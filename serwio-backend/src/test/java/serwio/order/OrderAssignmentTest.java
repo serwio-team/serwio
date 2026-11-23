@@ -8,7 +8,6 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.temporal.TemporalAdjusters;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +25,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -325,7 +325,7 @@ class OrderAssignmentTest {
         assertThat(currentStatus()).isEqualTo("AWAITING_SCHEDULING");
     }
 
-    private UUID proposalId(org.springframework.test.web.servlet.MvcResult result) throws Exception {
+    private UUID proposalId(MvcResult result) throws Exception {
         return UUID.fromString(mapper.readTree(result.getResponse().getContentAsString())
                 .path("currentProposal").path("id").asText());
     }
@@ -401,6 +401,71 @@ class OrderAssignmentTest {
         var newId = mapper.readTree(newVisit.getResponse().getContentAsString()).get("id").asText();
         assertThat(newId).isNotEqualTo(id.toString());
         visitWrite(post(visitsPath + "/" + newId + "/proposals"), coordinator, range).andExpect(status().isOk());
+    }
+
+    @Test
+    void visitConcurrentAcceptancesAtDifferentLocationsReserveSharedPerformerOnce() throws Exception {
+        var company = login(companyA);
+        var ownerSessionA = login(owner);
+        var ownerSessionB = login(owner);
+        var otherCoordinatorAccount = account("TECHNICIAN", "ACTIVE");
+        var otherCoordinator = technician(otherCoordinatorAccount, a1, "Drugi koordynator", true);
+        var firstActor = login(t2.getUser());
+        var secondActor = login(otherCoordinatorAccount);
+        var otherObject = objectAtNewLocation(serviceObject.getLocation().getAssetOwner(), "Druga lokalizacja");
+        var otherOrder = newOrder(firmA, "NEW", otherObject).getId();
+        setTuesdayHours(ownerSessionA, serviceObject.getLocation().getId(), "08:00", "16:00");
+        setTuesdayHours(ownerSessionB, otherObject.getLocation().getId(), "08:00", "16:00");
+        var visitA = createDraft(orderId, company, List.of(t2.getId(), t1.getId()), t2.getId());
+        var visitB = createDraft(otherOrder, company, List.of(otherCoordinator.getId(), t1.getId()), otherCoordinator.getId());
+        var start = nextTuesday(9);
+        var proposalPathA = orderPath(orderId) + "/visits/" + visitA + "/proposals";
+        var proposalPathB = orderPath(otherOrder) + "/visits/" + visitB + "/proposals";
+        var proposalA = propose(proposalPathA, firstActor, start);
+        var proposalB = propose(proposalPathB, secondActor, start);
+
+        var results = concurrently(
+                () -> mvc.perform(post(proposalPathA + "/" + proposalA + "/accept").session(ownerSessionA).with(csrf())).andReturn(),
+                () -> mvc.perform(post(proposalPathB + "/" + proposalB + "/accept").session(ownerSessionB).with(csrf())).andReturn());
+        assertThat(results).extracting(result -> result.getResponse().getStatus()).containsExactlyInAnyOrder(200, 409);
+        var firstWon = results.getFirst().getResponse().getStatus() == 200;
+        var conflict = results.get(firstWon ? 1 : 0).getResponse();
+        assertThat(mapper.readTree(conflict.getContentAsString()).path("code").asText()).isEqualTo("TECHNICIAN_TIME_CONFLICT");
+        var pendingId = firstWon ? proposalB : proposalA;
+        var waiting = visits.findById(firstWon ? visitB : visitA).orElseThrow();
+        assertThat(waiting.getStatus()).isEqualTo("DRAFT");
+        assertThat(waiting.getStartsAt()).isNull();
+        assertThat(proposals.findById(pendingId).orElseThrow().getRespondedAt()).isNull();
+
+        var waitingPath = firstWon ? proposalPathB : proposalPathA;
+        var waitingActor = firstWon ? secondActor : firstActor;
+        mvc.perform(post(waitingPath + "/" + pendingId + "/reject").session(ownerSessionA).with(csrf()))
+                .andExpect(status().isOk());
+        visitWrite(post(waitingPath), waitingActor, timeRange(start, start.plusHours(1)))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("TECHNICIAN_TIME_CONFLICT"));
+        var touching = propose(waitingPath, waitingActor, start.plusHours(1));
+        mvc.perform(post(waitingPath + "/" + touching + "/accept").session(ownerSessionA).with(csrf()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void visitConcurrentDraftCreationCommitsOnlyOneVisit() throws Exception {
+        var first = login(companyA);
+        var second = login(companyA);
+        put(first, body(0, List.of(a1.getId()), List.of(), t1.getId())).andExpect(status().isOk());
+        var visitsPath = orderPath(orderId) + "/visits";
+        var staff = Map.of("technicianIds", List.of(t1.getId()), "coordinatorTechnicianId", t1.getId());
+        var codes = concurrently(
+                () -> visitWrite(post(visitsPath), first, staff).andReturn().getResponse().getStatus(),
+                () -> visitWrite(post(visitsPath), second, staff).andReturn().getResponse().getStatus());
+        assertThat(codes).containsExactlyInAnyOrder(201, 409);
+        assertThat(visits.findAllByServiceOrderIdOrderByCreatedAtDescIdAsc(orderId)).hasSize(1);
+        assertThat(statusHistory()).containsExactly("ASSIGNED", "AWAITING_SCHEDULING");
+    }
+
+    private UUID propose(String path, MockHttpSession coordinator, OffsetDateTime start) throws Exception {
+        return proposalId(visitWrite(post(path), coordinator, timeRange(start, start.plusHours(1)))
+                .andExpect(status().isOk()).andReturn());
     }
 
     @Test
@@ -722,33 +787,32 @@ class OrderAssignmentTest {
     void concurrentSavesWithSameVersionLetOnlyOneWin() throws Exception {
         var first = login(companyA);
         var second = login(companyA);
-        var ready = new CountDownLatch(2);
-        var start = new CountDownLatch(1);
-        var executor = Executors.newFixedThreadPool(2);
-        try {
-            List<Callable<Integer>> calls = new ArrayList<>();
-            calls.add(() -> race(ready, start, first, body(0, List.of(a1.getId()), List.of(), t1.getId())));
-            calls.add(() -> race(ready, start, second, body(0, List.of(a2.getId()), List.of(), t2.getId())));
-            var futures = calls.stream().map(executor::submit).toList();
-            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
-            start.countDown();
-            var codes = new ArrayList<Integer>();
-            for (var future : futures) codes.add(future.get(30, TimeUnit.SECONDS));
-            assertThat(codes).containsExactlyInAnyOrder(200, 409);
-        } finally {
-            executor.shutdownNow();
-        }
+        var codes = concurrently(
+                () -> put(first, body(0, List.of(a1.getId()), List.of(), t1.getId())).andReturn().getResponse().getStatus(),
+                () -> put(second, body(0, List.of(a2.getId()), List.of(), t2.getId())).andReturn().getResponse().getStatus());
+        assertThat(codes).containsExactlyInAnyOrder(200, 409);
         assertThat(activeCount("order_branch_assignment")).isEqualTo(1);
         assertThat(statusHistory()).containsExactly("ASSIGNED");
         assertThat(jdbc.queryForObject("select assignment_version from service_order where id = ?", Long.class, orderId))
                 .isEqualTo(1L);
     }
 
-    private int race(CountDownLatch ready, CountDownLatch start, MockHttpSession session,
-                     Map<String, Object> data) throws Exception {
-        ready.countDown();
-        start.await();
-        return put(session, data).andReturn().getResponse().getStatus();
+    private static <T> List<T> concurrently(Callable<T> first, Callable<T> second) throws Exception {
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var futures = List.of(first, second).stream().map(call -> executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return call.call();
+            })).toList();
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            return List.of(futures.get(0).get(30, TimeUnit.SECONDS), futures.get(1).get(30, TimeUnit.SECONDS));
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     private void assertNothingWritten() {
@@ -860,9 +924,13 @@ class OrderAssignmentTest {
         assetOwner.setName("Właściciel");
         assetOwner.setCreatedAt(now());
         owners.save(assetOwner);
+        return newOrder(company, status, objectAtNewLocation(assetOwner, "Lokalizacja"));
+    }
+
+    private ServiceObject objectAtNewLocation(AssetOwner assetOwner, String name) {
         var location = new Location();
         location.setAssetOwner(assetOwner);
-        location.setName("Lokalizacja");
+        location.setName(name);
         location.setAddressLine("Testowa 1");
         location.setCity("Warszawa");
         location.setPostalCode("00-001");
@@ -876,8 +944,7 @@ class OrderAssignmentTest {
         object.setType("AC");
         object.setActive(true);
         object.setCreatedAt(now());
-        objects.save(object);
-        return newOrder(company, status, object);
+        return objects.save(object);
     }
 
     private ServiceOrder newOrder(ServiceCompany company, String status, ServiceObject object) {

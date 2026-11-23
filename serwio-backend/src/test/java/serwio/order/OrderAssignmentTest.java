@@ -44,6 +44,8 @@ import serwio.order.model.ServiceOrder;
 import serwio.order.repository.ServiceOrderRepository;
 import serwio.owner.model.AssetOwner;
 import serwio.owner.repository.AssetOwnerRepository;
+import serwio.report.model.ServiceReport;
+import serwio.report.repository.ServiceReportRepository;
 import serwio.technician.model.Technician;
 import serwio.technician.repository.TechnicianRepository;
 import serwio.visit.model.ServiceVisit;
@@ -81,6 +83,7 @@ class OrderAssignmentTest {
     @Autowired ServiceBranchRepository branches;
     @Autowired TechnicianRepository technicians;
     @Autowired ServiceOrderRepository orders;
+    @Autowired ServiceReportRepository reports;
     @Autowired ServiceVisitRepository visits;
     @Autowired VisitProposalRepository proposals;
     @MockitoBean Clock visitClock;
@@ -583,6 +586,69 @@ class OrderAssignmentTest {
 
     private ResultActions orderAction(UUID id, String action, MockHttpSession session) throws Exception {
         return mvc.perform(post(orderPath(id) + "/" + action).session(session).with(csrf()));
+    }
+
+    @Test
+    void orderClosingRequiresCompletedWorkAndTheOrdersFinalReport() throws Exception {
+        var company = login(companyA);
+        var ownerSession = login(owner);
+        orderAction(orderId, "close", company).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_ORDER_STATE"));
+        orderAction(orderId, "close", ownerSession).andExpect(status().isForbidden());
+        orderAction(orderId, "close", login(companyB)).andExpect(status().isNotFound());
+
+        var visitId = completeFirstVisit(company);
+        orderAction(orderId, "close", company).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REPORT_NOT_FINALIZED"));
+        var report = createDraftReport();
+        orderAction(orderId, "close", company).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REPORT_NOT_FINALIZED"));
+        mvc.perform(get(orderPath(orderId)).session(ownerSession)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.reportFinalized").value(false));
+
+        finalizeReport(report);
+        mvc.perform(get(orderPath(orderId)).session(company)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentStatus").value("COMPLETED"))
+                .andExpect(jsonPath("$.reportFinalized").value(true));
+        orderAction(orderId, "close", company).andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentStatus").value("CLOSED"))
+                .andExpect(jsonPath("$.closedAt").isString())
+                .andExpect(jsonPath("$.reportFinalized").value(true));
+        orderAction(orderId, "close", company).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_ORDER_STATE"));
+        assertThat(activeCount("order_technician_assignment")).isZero();
+        assertThat(visits.findById(visitId).orElseThrow().getStatus()).isEqualTo("COMPLETED");
+        assertThat(statusHistory()).endsWith("IN_PROGRESS", "COMPLETED", "CLOSED");
+    }
+
+    private UUID completeFirstVisit(MockHttpSession company) throws Exception {
+        var coordinator = login(technicianLogin);
+        var planned = nextTuesday(9);
+        var visitId = confirmVisit(company, List.of(t1.getId()), t1, planned);
+        var visitPath = orderPath(orderId) + "/visits/" + visitId;
+        when(visitClock.instant()).thenReturn(planned.toInstant());
+        mvc.perform(post(visitPath + "/start").session(coordinator).with(csrf())).andExpect(status().isOk());
+        when(visitClock.instant()).thenReturn(planned.plusMinutes(30).toInstant());
+        visitWrite(post(visitPath + "/complete"), coordinator, Map.of("outcome", "COMPLETED"))
+                .andExpect(status().isOk());
+        when(visitClock.instant()).thenReturn(planned.plusHours(1).toInstant());
+        return visitId;
+    }
+
+    private ServiceReport createDraftReport() {
+        var report = new ServiceReport();
+        report.setServiceOrder(orders.findById(orderId).orElseThrow());
+        report.setAuthorTechnician(t1);
+        report.setCreatedAt(OffsetDateTime.now(visitClock));
+        return reports.save(report);
+    }
+
+    private void finalizeReport(ServiceReport report) {
+        report.setActionsDone("Weryfikacja działania");
+        report.setDiagnosis("Uszkodzony filtr");
+        report.setResolution("Wymieniono filtr");
+        report.setFinalizedAt(OffsetDateTime.now(visitClock));
+        reports.save(report);
     }
 
     @Test

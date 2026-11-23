@@ -43,4 +43,9 @@ public class ServiceOrderController {
     public ServiceOrderResponse cancel(@PathVariable UUID id) {
         return termination.cancel(id);
     }
+
+    @PostMapping("/{id}/close")
+    public ServiceOrderResponse close(@PathVariable UUID id) {
+        return termination.close(id);
+    }
 }

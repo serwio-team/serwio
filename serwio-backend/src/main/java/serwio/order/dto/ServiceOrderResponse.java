@@ -8,4 +8,5 @@ public record ServiceOrderResponse(
         UUID locationId, String locationName, String addressLine, String city, String timezone,
         UUID assetOwnerId, String assetOwnerName, UUID serviceCompanyId,
         String orderType, String description, String currentStatus,
-        UUID createdByUserId, OffsetDateTime createdAt, OffsetDateTime closedAt) implements ServiceOrderDetailsResponse {}
+        UUID createdByUserId, OffsetDateTime createdAt, OffsetDateTime closedAt,
+        boolean reportFinalized) implements ServiceOrderDetailsResponse {}

@@ -18,7 +18,9 @@ import serwio.order.repository.OrderBranchAssignmentRepository;
 import serwio.order.repository.OrderStatusHistoryRepository;
 import serwio.order.repository.OrderTechnicianAssignmentRepository;
 import serwio.order.repository.ServiceOrderRepository;
+import serwio.report.repository.ServiceReportRepository;
 import serwio.security.CurrentUser;
+import serwio.visit.model.VisitStatus;
 import serwio.visit.repository.ServiceVisitRepository;
 import serwio.visit.service.VisitStaffingService;
 
@@ -36,6 +38,7 @@ public class OrderTerminationService {
     private final OrderTechnicianAssignmentRepository technicianAssignments;
     private final OrderStatusHistoryRepository history;
     private final ServiceVisitRepository visits;
+    private final ServiceReportRepository reports;
     private final VisitStaffingService staffing;
     private final ServiceOrderService orderReadService;
     private final CurrentUser currentUser;
@@ -49,6 +52,19 @@ public class OrderTerminationService {
         var now = terminationTime();
         staffing.cancelForOrder(order, now);
         return endOrder(order, OrderStatus.CANCELLED, now);
+    }
+
+    public ServiceOrderResponse close(UUID orderId) {
+        var order = lockCompanyOrder(orderId);
+        if (!OrderStatus.COMPLETED.name().equals(order.getCurrentStatus())
+                || visits.existsByServiceOrderIdAndStatusNotIn(orderId,
+                        List.of(VisitStatus.CANCELLED.name(), VisitStatus.COMPLETED.name()))) {
+            throw new ConflictException("INVALID_ORDER_STATE", "Zamknąć można tylko wykonane zlecenie.");
+        }
+        if (!reports.existsByServiceOrderIdAndFinalizedAtIsNotNull(orderId)) {
+            throw new ConflictException("REPORT_NOT_FINALIZED", "Przed zamknięciem zlecenia sfinalizuj raport.");
+        }
+        return endOrder(order, OrderStatus.CLOSED, terminationTime());
     }
 
     private ServiceOrder lockCompanyOrder(UUID orderId) {

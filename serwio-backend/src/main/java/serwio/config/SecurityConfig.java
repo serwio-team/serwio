@@ -38,6 +38,8 @@ public class SecurityConfig {
                                 .hasRole("SERVICE_COMPANY")
                         .requestMatchers(HttpMethod.GET, "/api/service-orders/*/visits/candidates")
                                 .hasRole("SERVICE_COMPANY")
+                        .requestMatchers(HttpMethod.GET, "/api/service-orders/*/visits")
+                                .hasAnyRole("ASSET_OWNER", "SERVICE_COMPANY", "TECHNICIAN")
                         .requestMatchers(HttpMethod.GET, "/api/service-orders", "/api/service-orders/*")
                                 .hasAnyRole("ASSET_OWNER", "SERVICE_COMPANY", "TECHNICIAN")
                         .requestMatchers("/api/service-orders", "/api/service-orders/**").denyAll()

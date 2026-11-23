@@ -39,6 +39,8 @@ import serwio.owner.model.AssetOwner;
 import serwio.owner.repository.AssetOwnerRepository;
 import serwio.technician.model.Technician;
 import serwio.technician.repository.TechnicianRepository;
+import serwio.visit.model.ServiceVisit;
+import serwio.visit.repository.ServiceVisitRepository;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -69,6 +71,7 @@ class OrderAssignmentTest {
     @Autowired ServiceBranchRepository branches;
     @Autowired TechnicianRepository technicians;
     @Autowired ServiceOrderRepository orders;
+    @Autowired ServiceVisitRepository visits;
 
     /** Firma A z dwoma aktywnymi i jednym nieaktywnym oddziałem, firma B z jednym oddziałem. */
     UserAccount companyA, companyB, owner, technicianLogin;
@@ -123,6 +126,40 @@ class OrderAssignmentTest {
         mvc.perform(get(candidatesPath).session(login(owner))).andExpect(status().isForbidden());
         mvc.perform(get(candidatesPath).session(login(technicianLogin))).andExpect(status().isForbidden());
         mvc.perform(get(candidatesPath)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void visitReadUsesOrderPermissionsAndReturnsLocationAvailability() throws Exception {
+        var firmSession = login(companyA);
+        var ownerSession = login(owner);
+        var technicianSession = login(technicianLogin);
+        var visitsPath = orderPath(orderId) + "/visits";
+        mvc.perform(putRequest("/api/locations/" + serviceObject.getLocation().getId() + "/availability",
+                Map.of("days", List.of(Map.of("dayOfWeek", 2, "intervals", List.of(Map.of("from", "08:00", "to", "16:00"))))))
+                .with(csrf()).session(ownerSession)).andExpect(status().isOk());
+        mvc.perform(get(visitsPath).session(ownerSession)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.timezone").value("Europe/Warsaw"))
+                .andExpect(jsonPath("$.availability[0].dayOfWeek").value(2))
+                .andExpect(jsonPath("$.availability[0].intervals[0].from").value("08:00"))
+                .andExpect(jsonPath("$.visits").isEmpty());
+        mvc.perform(get(visitsPath).session(technicianSession)).andExpect(status().isNotFound());
+        mvc.perform(get(visitsPath).session(login(companyB))).andExpect(status().isNotFound());
+        mvc.perform(get(visitsPath)).andExpect(status().isUnauthorized());
+
+        put(firmSession, body(0, List.of(a1.getId()), List.of(), t1.getId())).andExpect(status().isOk());
+        var visit = new ServiceVisit();
+        visit.setServiceOrder(orders.findById(orderId).orElseThrow());
+        visit.setCoordinatorTechnician(t1);
+        visit.setStatus("DRAFT");
+        visit.setCreatedAt(now());
+        visits.save(visit);
+        for (var session : List.of(firmSession, ownerSession, technicianSession)) {
+            mvc.perform(get(visitsPath).session(session)).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.visits[0].id").value(visit.getId().toString()))
+                    .andExpect(jsonPath("$.visits[0].status").value("DRAFT"))
+                    .andExpect(jsonPath("$.visits[0].coordinatorTechnicianId").value(t1.getId().toString()))
+                    .andExpect(jsonPath("$.visits[0].currentProposal").value(nullValue()));
+        }
     }
 
     @Test

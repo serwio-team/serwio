@@ -1,7 +1,11 @@
 package serwio.order;
 
 import java.time.OffsetDateTime;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -234,6 +238,54 @@ class OrderAssignmentTest {
         visitWrite(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
                 orderPath(anotherOrder.getId()) + "/visits/" + visitId + "/staffing"), firmSession, firstStaff)
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void visitCoordinatorProposesOnlyOnceAndOnlyWithinCurrentHours() throws Exception {
+        var firmSession = login(companyA);
+        var ownerSession = login(owner);
+        var coordinatorSession = login(technicianLogin);
+        var visitId = createDraft(orderId, firmSession, List.of(t1.getId(), t2.getId()), t1.getId());
+        var path = orderPath(orderId) + "/visits/" + visitId + "/proposals";
+        var startsAt = nextTuesday(9);
+        var range = timeRange(startsAt, startsAt.plusHours(1));
+        visitWrite(post(path), ownerSession, range).andExpect(status().isForbidden());
+        visitWrite(post(path), login(t2.getUser()), range).andExpect(status().isForbidden());
+        visitWrite(post(path), coordinatorSession, range).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("OUTSIDE_LOCATION_AVAILABILITY"));
+
+        setTuesdayHours(ownerSession, serviceObject.getLocation().getId(), "08:00", "16:00");
+        visitWrite(post(path), coordinatorSession, timeRange(startsAt.withOffsetSameLocal(ZoneOffset.UTC), startsAt.plusHours(1)))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors.startsAt").isArray());
+        visitWrite(post(path), coordinatorSession, range).andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentProposal.proposedBy").value("COORDINATOR"))
+                .andExpect(jsonPath("$.startsAt").value(nullValue()));
+        visitWrite(post(path), coordinatorSession, range).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_VISIT_STATE"));
+    }
+
+    private UUID createDraft(UUID id, MockHttpSession session, List<UUID> staff, UUID coordinator) throws Exception {
+        put(session, body(0, List.of(), staff, coordinator), id).andExpect(status().isOk());
+        var result = visitWrite(post(orderPath(id) + "/visits"), session,
+                Map.of("technicianIds", staff, "coordinatorTechnicianId", coordinator))
+                .andExpect(status().isCreated()).andReturn();
+        return UUID.fromString(mapper.readTree(result.getResponse().getContentAsString()).get("id").asText());
+    }
+
+    private void setTuesdayHours(MockHttpSession session, UUID locationId, String from, String to) throws Exception {
+        mvc.perform(putRequest("/api/locations/" + locationId + "/availability",
+                Map.of("days", List.of(Map.of("dayOfWeek", 2, "intervals", List.of(Map.of("from", from, "to", to))))))
+                .session(session).with(csrf())).andExpect(status().isOk());
+    }
+
+    private static OffsetDateTime nextTuesday(int hour) {
+        var zone = ZoneId.of("Europe/Warsaw");
+        return LocalDate.now(zone).with(TemporalAdjusters.next(DayOfWeek.TUESDAY)).atTime(hour, 0)
+                .atZone(zone).toOffsetDateTime();
+    }
+
+    private static Map<String, ?> timeRange(OffsetDateTime startsAt, OffsetDateTime endsAt) {
+        return Map.of("startsAt", startsAt.toString(), "endsAt", endsAt.toString());
     }
 
     @Test

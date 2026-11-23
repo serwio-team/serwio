@@ -17,7 +17,9 @@ import serwio.visit.dto.ServiceVisitResponse;
 import serwio.visit.dto.ServiceVisitsResponse;
 import serwio.visit.dto.VisitStaffingRequest;
 import serwio.visit.dto.VisitTechnicianResponse;
+import serwio.visit.dto.VisitTimeRange;
 import serwio.visit.service.ServiceVisitService;
+import serwio.visit.service.VisitNegotiationService;
 import serwio.visit.service.VisitStaffingService;
 
 @RestController
@@ -26,6 +28,7 @@ import serwio.visit.service.VisitStaffingService;
 public class ServiceVisitController {
     private final ServiceVisitService visits;
     private final VisitStaffingService staffing;
+    private final VisitNegotiationService negotiation;
 
     @GetMapping
     public ServiceVisitsResponse list(@PathVariable UUID orderId) {
@@ -47,5 +50,11 @@ public class ServiceVisitController {
     public ServiceVisitResponse replaceStaffing(@PathVariable UUID orderId, @PathVariable UUID visitId,
                                                 @Valid @RequestBody VisitStaffingRequest request) {
         return staffing.replace(orderId, visitId, request);
+    }
+
+    @PostMapping("/{visitId}/proposals")
+    public ServiceVisitResponse propose(@PathVariable UUID orderId, @PathVariable UUID visitId,
+                                        @Valid @RequestBody VisitTimeRange request) {
+        return negotiation.propose(orderId, visitId, request);
     }
 }

@@ -54,4 +54,8 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, UUID
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<ServiceOrder> findForUpdateByIdAndServiceCompanyUserId(UUID id, UUID userId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select o from ServiceOrder o where o.id = :id and " + TECHNICIAN_ACCESS)
+    Optional<ServiceOrder> findForUpdateByIdForTechnician(UUID id, UUID userId);
 }

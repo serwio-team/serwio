@@ -1,5 +1,7 @@
 package serwio.order;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -24,6 +26,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -54,6 +57,7 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -79,6 +83,7 @@ class OrderAssignmentTest {
     @Autowired ServiceOrderRepository orders;
     @Autowired ServiceVisitRepository visits;
     @Autowired VisitProposalRepository proposals;
+    @MockitoBean Clock visitClock;
 
     /** Firma A z dwoma aktywnymi i jednym nieaktywnym oddziałem, firma B z jednym oddziałem. */
     UserAccount companyA, companyB, owner, technicianLogin;
@@ -90,6 +95,8 @@ class OrderAssignmentTest {
 
     @BeforeEach
     void setUp() {
+        when(visitClock.getZone()).thenReturn(ZoneOffset.UTC);
+        when(visitClock.instant()).thenAnswer(invocation -> Instant.now());
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             companyA = account("SERVICE_COMPANY", "ACTIVE");
             companyB = account("SERVICE_COMPANY", "ACTIVE");
@@ -358,6 +365,42 @@ class OrderAssignmentTest {
         mvc.perform(post(acceptance).session(ownerSession).with(csrf())).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("STALE_PROPOSAL"));
         put(firmSession, body(3, List.of(), List.of(t2.getId()), t2.getId())).andExpect(status().isConflict());
+    }
+
+    @Test
+    void visitCancellationHonorsStartBoundaryAndReleasesReservation() throws Exception {
+        var company = login(companyA);
+        var ownerSession = login(owner);
+        var coordinator = login(technicianLogin);
+        var id = createDraft(orderId, company, List.of(t1.getId()), t1.getId());
+        var visitsPath = orderPath(orderId) + "/visits";
+        var path = visitsPath + "/" + id;
+        var start = nextTuesday(9);
+        var range = timeRange(start, start.plusHours(1));
+        setTuesdayHours(ownerSession, serviceObject.getLocation().getId(), "08:00", "16:00");
+        var proposed = visitWrite(post(path + "/proposals"), coordinator, range).andExpect(status().isOk()).andReturn();
+        var proposal = proposalId(proposed);
+        mvc.perform(post(path + "/proposals/" + proposal + "/accept").session(ownerSession).with(csrf()))
+                .andExpect(status().isOk());
+        mvc.perform(post(path + "/cancel").session(ownerSession).with(csrf())).andExpect(status().isForbidden());
+
+        when(visitClock.instant()).thenReturn(start.toInstant());
+        mvc.perform(post(path + "/cancel").session(company).with(csrf())).andExpect(status().isConflict());
+        assertThat(currentStatus()).isEqualTo("VISIT_CONFIRMED");
+
+        when(visitClock.instant()).thenReturn(start.minusMinutes(1).toInstant());
+        mvc.perform(post(path + "/cancel").session(company).with(csrf())).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED")).andExpect(jsonPath("$.startsAt").isString());
+        mvc.perform(post(path + "/cancel").session(company).with(csrf())).andExpect(status().isConflict());
+        assertThat(proposals.findById(proposal).orElseThrow().getStatus()).isEqualTo("ACCEPTED");
+        assertThat(currentStatus()).isEqualTo("ASSIGNED");
+
+        var newVisit = visitWrite(post(visitsPath), company,
+                Map.of("technicianIds", List.of(t1.getId()), "coordinatorTechnicianId", t1.getId()))
+                .andExpect(status().isCreated()).andReturn();
+        var newId = mapper.readTree(newVisit.getResponse().getContentAsString()).get("id").asText();
+        assertThat(newId).isNotEqualTo(id.toString());
+        visitWrite(post(visitsPath + "/" + newId + "/proposals"), coordinator, range).andExpect(status().isOk());
     }
 
     @Test

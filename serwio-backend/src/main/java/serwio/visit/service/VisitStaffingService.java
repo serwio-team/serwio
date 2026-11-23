@@ -1,8 +1,8 @@
 package serwio.visit.service;
 
+import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +41,8 @@ public class VisitStaffingService {
     private final OrderStatusHistoryRepository history;
     private final CurrentUser currentUser;
     private final ServiceVisitService readService;
+    private final VisitReservationLocks reservationLocks;
+    private final Clock clock;
 
     @Transactional
     public ServiceVisitResponse create(UUID orderId, VisitStaffingRequest request) {
@@ -51,7 +53,7 @@ public class VisitStaffingService {
             throw new VisitConflictException("INVALID_VISIT_STATE", "Nie można utworzyć wizyty dla tego zlecenia.");
         }
         var staff = validateStaff(orderId, request);
-        var now = OffsetDateTime.now(ZoneOffset.UTC);
+        var now = OffsetDateTime.now(clock);
         var visit = new ServiceVisit();
         visit.setServiceOrder(order);
         visit.setCoordinatorTechnician(coordinator(staff, request.coordinatorTechnicianId()));
@@ -68,8 +70,7 @@ public class VisitStaffingService {
     @Transactional
     public ServiceVisitResponse replace(UUID orderId, UUID visitId, VisitStaffingRequest request) {
         var order = lockCompanyOrder(orderId);
-        var visit = visits.findByIdAndServiceOrderId(visitId, orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Nie znaleziono wizyty: " + visitId));
+        var visit = findVisit(orderId, visitId);
         if (order.getClosedAt() != null || !VisitStatus.DRAFT.name().equals(visit.getStatus())) {
             throw new VisitConflictException("INVALID_VISIT_STATE", "Obsadę można zmienić podczas uzgadniania terminu.");
         }
@@ -82,18 +83,47 @@ public class VisitStaffingService {
             technicians.saveAll(staff.stream().filter(member -> !before.contains(member.getId()))
                     .map(member -> membership(visit, member)).toList());
             visit.setCoordinatorTechnician(coordinator(staff, request.coordinatorTechnicianId()));
-            expirePendingProposal(order, visitId);
+            expirePendingProposal(order, visitId, OffsetDateTime.now(clock));
         }
         return readService.response(visit, ZoneId.of(order.getServiceObject().getLocation().getTimezone()));
     }
 
-    private void expirePendingProposal(ServiceOrder order, UUID visitId) {
+    @Transactional
+    public ServiceVisitResponse cancel(UUID orderId, UUID visitId) {
+        var order = lockCompanyOrder(orderId);
+        var visit = findVisit(orderId, visitId);
+        var draft = VisitStatus.DRAFT.name().equals(visit.getStatus())
+                && OrderStatus.AWAITING_SCHEDULING.name().equals(order.getCurrentStatus());
+        var confirmed = VisitStatus.CONFIRMED.name().equals(visit.getStatus())
+                && OrderStatus.VISIT_CONFIRMED.name().equals(order.getCurrentStatus());
+        if (order.getClosedAt() != null || (!draft && !confirmed)) {
+            throw new VisitConflictException("INVALID_VISIT_STATE", "Tej wizyty nie można anulować.");
+        }
+        var location = confirmed ? reservationLocks.lock(visit).location() : order.getServiceObject().getLocation();
+        var now = OffsetDateTime.now(clock);
+        if (confirmed && (visit.getStartsAt() == null || !visit.getStartsAt().isAfter(now))) {
+            throw new VisitConflictException("INVALID_VISIT_STATE", "Potwierdzoną wizytę można anulować przed jej rozpoczęciem.");
+        }
+
+        expirePendingProposal(order, visitId, now);
+        visit.setStatus(VisitStatus.CANCELLED.name());
+        order.setCurrentStatus(OrderStatus.ASSIGNED.name());
+        history.save(OrderStatusHistory.forChange(order, order.getServiceCompany().getUser(), now));
+        return readService.response(visit, ZoneId.of(location.getTimezone()));
+    }
+
+    private void expirePendingProposal(ServiceOrder order, UUID visitId, OffsetDateTime now) {
         proposals.findFirstByVisitIdAndStatusOrderByCreatedAtDescIdAsc(visitId, VisitProposalStatus.PENDING.name())
                 .ifPresent(proposal -> {
                     proposal.setStatus(VisitProposalStatus.EXPIRED.name());
                     proposal.setRespondedByUser(order.getServiceCompany().getUser());
-                    proposal.setRespondedAt(OffsetDateTime.now(ZoneOffset.UTC));
+                    proposal.setRespondedAt(now);
                 });
+    }
+
+    private ServiceVisit findVisit(UUID orderId, UUID visitId) {
+        return visits.findByIdAndServiceOrderId(visitId, orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Nie znaleziono wizyty: " + visitId));
     }
 
     private ServiceOrder lockCompanyOrder(UUID orderId) {

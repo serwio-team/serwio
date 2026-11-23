@@ -75,4 +75,9 @@ public class ServiceVisitController {
                                        @PathVariable UUID proposalId) {
         return negotiation.accept(orderId, visitId, proposalId);
     }
+
+    @PostMapping("/{visitId}/cancel")
+    public ServiceVisitResponse cancel(@PathVariable UUID orderId, @PathVariable UUID visitId) {
+        return staffing.cancel(orderId, visitId);
+    }
 }

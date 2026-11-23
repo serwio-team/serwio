@@ -1,8 +1,8 @@
 package serwio.visit.service;
 
+import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -45,6 +45,7 @@ public class VisitNegotiationService {
     private final UserAccountRepository accounts;
     private final CurrentUser currentUser;
     private final ServiceVisitService readService;
+    private final Clock clock;
 
     public ServiceVisitResponse propose(UUID orderId, UUID visitId, VisitTimeRange request) {
         var userId = currentUser.id();
@@ -59,7 +60,7 @@ public class VisitNegotiationService {
         }
         var location = order.getServiceObject().getLocation();
         var zone = ZoneId.of(location.getTimezone());
-        var now = OffsetDateTime.now(ZoneOffset.UTC);
+        var now = OffsetDateTime.now(clock);
         VisitCalendar.validateRequest(request, zone, now.toInstant());
         requireAvailable(visit, request, location, now, technicians.findTechnicianIds(visitId));
         saveProposal(visit, request, coordinator, now);
@@ -68,7 +69,7 @@ public class VisitNegotiationService {
 
     public ServiceVisitResponse reject(UUID orderId, UUID visitId, UUID proposalId) {
         var reply = prepareReply(orderId, visitId, proposalId);
-        respond(reply, VisitProposalStatus.REJECTED, OffsetDateTime.now(ZoneOffset.UTC));
+        respond(reply, VisitProposalStatus.REJECTED, OffsetDateTime.now(clock));
         return readService.response(reply.visit(), ZoneId.of(reply.location().getTimezone()));
     }
 
@@ -76,7 +77,7 @@ public class VisitNegotiationService {
         var reply = prepareReply(orderId, visitId, proposalId);
         var location = reply.location();
         var zone = ZoneId.of(location.getTimezone());
-        var now = OffsetDateTime.now(ZoneOffset.UTC);
+        var now = OffsetDateTime.now(clock);
         VisitCalendar.validateRequest(request, zone, now.toInstant());
         requireAvailable(reply.visit(), request, location, now, technicians.findTechnicianIds(visitId));
         respond(reply, VisitProposalStatus.COUNTERED, now);
@@ -88,7 +89,7 @@ public class VisitNegotiationService {
         var reply = prepareReply(orderId, visitId, proposalId);
         var visit = reply.visit();
         var locked = reservationLocks.lock(visit);
-        var now = OffsetDateTime.now(ZoneOffset.UTC);
+        var now = OffsetDateTime.now(clock);
         var proposal = reply.proposal();
         var range = new VisitTimeRange(proposal.getProposedStartsAt(), proposal.getProposedEndsAt());
         requireAvailable(visit, range, locked.location(), now, locked.technicianIds());

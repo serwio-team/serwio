@@ -103,6 +103,29 @@ class OrderAssignmentTest {
     }
 
     @Test
+    void visitCandidatesUseCurrentAssignmentsAndOnlyCurrentCompanyCanRead() throws Exception {
+        var firmSession = login(companyA);
+        var candidatesPath = orderPath(orderId) + "/visits/candidates";
+        mvc.perform(get(candidatesPath).session(firmSession)).andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+
+        put(firmSession, body(0, List.of(a1.getId()), List.of(t1.getId(), t2.getId()), t1.getId()))
+                .andExpect(status().isOk());
+        mvc.perform(get(candidatesPath).session(firmSession)).andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].id", contains(t1.getId().toString(), t2.getId().toString())))
+                .andExpect(jsonPath("$[0].displayName").value(t1.getDisplayName()))
+                .andExpect(jsonPath("$[0].branchId").value(a1.getId().toString()));
+
+        put(firmSession, body(1, List.of(), List.of(t2.getId()), t2.getId())).andExpect(status().isOk());
+        mvc.perform(get(candidatesPath).session(firmSession)).andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].id", contains(t2.getId().toString())));
+        mvc.perform(get(candidatesPath).session(login(companyB))).andExpect(status().isNotFound());
+        mvc.perform(get(candidatesPath).session(login(owner))).andExpect(status().isForbidden());
+        mvc.perform(get(candidatesPath).session(login(technicianLogin))).andExpect(status().isForbidden());
+        mvc.perform(get(candidatesPath)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void getReturnsEmptyAssignmentForNewOrder() throws Exception {
         mvc.perform(get(path(orderId)).session(login(companyA))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.serviceOrderId").value(orderId.toString()))

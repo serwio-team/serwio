@@ -8,6 +8,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 
 public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, UUID> {
     @EntityGraph(attributePaths = {"serviceObject.location"})
@@ -20,4 +22,7 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, UUID
 
     Optional<ServiceOrder> findByIdAndServiceObjectLocationAssetOwnerUserId(UUID id, UUID userId);
     Optional<ServiceOrder> findByIdAndServiceCompanyUserId(UUID id, UUID userId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<ServiceOrder> findForUpdateByIdAndServiceCompanyUserId(UUID id, UUID userId);
 }

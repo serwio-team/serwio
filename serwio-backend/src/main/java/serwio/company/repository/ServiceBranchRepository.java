@@ -6,6 +6,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import jakarta.persistence.LockModeType;
 import serwio.company.model.ServiceBranch;
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 import java.util.Optional;
 
@@ -23,6 +25,8 @@ public interface ServiceBranchRepository extends JpaRepository<ServiceBranch, UU
     boolean existsByServiceCompanyIdAndNameIgnoreCase(UUID serviceCompanyId, String name);
 
     boolean existsByServiceCompanyIdAndNameIgnoreCaseAndIdNot(UUID serviceCompanyId, String name, UUID id);
+
+    List<ServiceBranch> findAllByIdInAndServiceCompanyIdAndActiveTrue(Collection<UUID> ids, UUID serviceCompanyId);
 
     long countByServiceCompanyIdAndActiveTrue(UUID serviceCompanyId);
 

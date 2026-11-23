@@ -46,6 +46,9 @@ public class SecurityConfig {
                                 .hasRole("SERVICE_COMPANY")
                         .requestMatchers(HttpMethod.POST, "/api/service-orders/*/visits/*/proposals")
                                 .hasRole("TECHNICIAN")
+                        .requestMatchers(HttpMethod.POST, "/api/service-orders/*/visits/*/proposals/*/counter",
+                                "/api/service-orders/*/visits/*/proposals/*/reject")
+                                .hasAnyRole("ASSET_OWNER", "TECHNICIAN")
                         .requestMatchers(HttpMethod.GET, "/api/service-orders", "/api/service-orders/*")
                                 .hasAnyRole("ASSET_OWNER", "SERVICE_COMPANY", "TECHNICIAN")
                         .requestMatchers("/api/service-orders", "/api/service-orders/**").denyAll()

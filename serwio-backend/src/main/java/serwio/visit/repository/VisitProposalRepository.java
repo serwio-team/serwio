@@ -7,4 +7,6 @@ import java.util.UUID;
 
 public interface VisitProposalRepository extends JpaRepository<VisitProposal, UUID> {
     Optional<VisitProposal> findFirstByVisitIdAndStatusOrderByCreatedAtDescIdAsc(UUID visitId, String status);
+
+    Optional<VisitProposal> findByIdAndVisitIdAndStatus(UUID proposalId, UUID visitId, String status);
 }

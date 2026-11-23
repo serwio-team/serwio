@@ -289,6 +289,41 @@ class OrderAssignmentTest {
     }
 
     @Test
+    void visitCounterAndRejectKeepHistoryAndNeverApplyAnOldProposal() throws Exception {
+        var ownerSession = login(owner);
+        var coordinatorSession = login(technicianLogin);
+        var visitId = createDraft(orderId, login(companyA), List.of(t1.getId()), t1.getId());
+        var path = orderPath(orderId) + "/visits/" + visitId + "/proposals";
+        setTuesdayHours(ownerSession, serviceObject.getLocation().getId(), "08:00", "16:00");
+        var suggested = nextTuesday(9);
+        var initial = visitWrite(post(path), coordinatorSession, timeRange(suggested, suggested.plusHours(1)))
+                .andExpect(status().isOk()).andReturn();
+        var first = proposalId(initial);
+        mvc.perform(post(path + "/" + first + "/reject").session(coordinatorSession).with(csrf()))
+                .andExpect(status().isForbidden());
+
+        var counter = visitWrite(post(path + "/" + first + "/counter"), ownerSession,
+                timeRange(suggested.plusHours(2), suggested.plusHours(3))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentProposal.proposedBy").value("OWNER")).andReturn();
+        var second = proposalId(counter);
+        assertThat(second).isNotEqualTo(first);
+        mvc.perform(post(path + "/" + first + "/reject").session(ownerSession).with(csrf()))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("STALE_PROPOSAL"));
+        mvc.perform(post(path + "/" + second + "/reject").session(coordinatorSession).with(csrf()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.currentProposal").value(nullValue()));
+        assertThat(proposals.findById(first).orElseThrow().getStatus()).isEqualTo("COUNTERED");
+        assertThat(proposals.findById(second).orElseThrow().getStatus()).isEqualTo("REJECTED");
+        assertThat(jdbc.queryForObject("select responded_by_user_id from visit_proposal where id = ?", UUID.class, second))
+                .isEqualTo(technicianLogin.getId());
+        assertThat(currentStatus()).isEqualTo("AWAITING_SCHEDULING");
+    }
+
+    private UUID proposalId(org.springframework.test.web.servlet.MvcResult result) throws Exception {
+        return UUID.fromString(mapper.readTree(result.getResponse().getContentAsString())
+                .path("currentProposal").path("id").asText());
+    }
+
+    @Test
     void getReturnsEmptyAssignmentForNewOrder() throws Exception {
         mvc.perform(get(path(orderId)).session(login(companyA))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.serviceOrderId").value(orderId.toString()))

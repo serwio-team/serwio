@@ -57,4 +57,16 @@ public class ServiceVisitController {
                                         @Valid @RequestBody VisitTimeRange request) {
         return negotiation.propose(orderId, visitId, request);
     }
+
+    @PostMapping("/{visitId}/proposals/{proposalId}/reject")
+    public ServiceVisitResponse reject(@PathVariable UUID orderId, @PathVariable UUID visitId,
+                                       @PathVariable UUID proposalId) {
+        return negotiation.reject(orderId, visitId, proposalId);
+    }
+
+    @PostMapping("/{visitId}/proposals/{proposalId}/counter")
+    public ServiceVisitResponse counter(@PathVariable UUID orderId, @PathVariable UUID visitId,
+                                        @PathVariable UUID proposalId, @Valid @RequestBody VisitTimeRange request) {
+        return negotiation.counter(orderId, visitId, proposalId, request);
+    }
 }

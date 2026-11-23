@@ -2,6 +2,9 @@ package serwio.report.service;
 
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
@@ -9,7 +12,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import serwio.account.repository.UserAccountRepository;
 import serwio.exception.ConflictException;
+import serwio.exception.FieldValidationException;
 import serwio.exception.ResourceNotFoundException;
+import serwio.order.model.OrderStatus;
 import serwio.order.model.ServiceOrder;
 import serwio.order.repository.ServiceOrderRepository;
 import serwio.report.dto.ReportDraftRequest;
@@ -19,6 +24,8 @@ import serwio.report.repository.ServiceReportRepository;
 import serwio.security.CurrentUser;
 import serwio.technician.model.Technician;
 import serwio.technician.repository.TechnicianRepository;
+import serwio.visit.model.VisitStatus;
+import serwio.visit.repository.VisitTechnicianRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +34,7 @@ public class ServiceReportService {
     private final ServiceReportRepository reports;
     private final UserAccountRepository accounts;
     private final TechnicianRepository technicians;
+    private final VisitTechnicianRepository visitTechnicians;
     private final CurrentUser currentUser;
     private final Clock clock;
 
@@ -68,6 +76,41 @@ public class ServiceReportService {
         report.setRecommendations(text(request.recommendations()));
         report.setUpdatedAt(OffsetDateTime.now(clock));
         return ServiceReportResponse.from(reports.save(report));
+    }
+
+    @Transactional
+    public ServiceReportResponse finalizeReport(UUID orderId) {
+        var userId = currentUser.id();
+        var order = lockOrderForAuthor(orderId, userId);
+        var report = reports.findByServiceOrderId(orderId).orElseThrow(ServiceReportService::reportNotFound);
+        requireWritableAuthor(report, userId);
+        if (!OrderStatus.COMPLETED.name().equals(order.getCurrentStatus())) {
+            throw new ConflictException("INVALID_ORDER_STATE", "Raport można sfinalizować po wykonaniu zlecenia.");
+        }
+        if (!participatedInCompletedVisit(orderId, report.getAuthorTechnician().getId())) {
+            throw new ConflictException("REPORT_AUTHOR_NOT_PARTICIPANT",
+                    "Autor raportu musi być w obsadzie zakończonej wizyty zlecenia.");
+        }
+        validateFinalContent(report);
+        report.setFinalizedAt(OffsetDateTime.now(clock));
+        return ServiceReportResponse.from(report);
+    }
+
+    private boolean participatedInCompletedVisit(UUID orderId, UUID technicianId) {
+        return visitTechnicians.existsByVisitServiceOrderIdAndTechnicianIdAndVisitStatus(
+                orderId, technicianId, VisitStatus.COMPLETED.name());
+    }
+
+    private static void validateFinalContent(ServiceReport report) {
+        Map<String, List<String>> errors = new LinkedHashMap<>();
+        requireText(errors, "actionsDone", report.getActionsDone());
+        requireText(errors, "diagnosis", report.getDiagnosis());
+        requireText(errors, "resolution", report.getResolution());
+        if (!errors.isEmpty()) throw new FieldValidationException(errors);
+    }
+
+    private static void requireText(Map<String, List<String>> errors, String field, String value) {
+        if (value == null || value.isBlank()) errors.put(field, List.of("Pole jest wymagane do finalizacji."));
     }
 
     private ServiceOrder lockOrderForAuthor(UUID orderId, UUID userId) {

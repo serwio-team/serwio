@@ -5,6 +5,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,5 +28,10 @@ public class ServiceReportController {
     @PutMapping
     public ServiceReportResponse saveDraft(@PathVariable UUID orderId, @Valid @RequestBody ReportDraftRequest request) {
         return reports.saveDraft(orderId, request);
+    }
+
+    @PostMapping("/finalize")
+    public ServiceReportResponse finalizeReport(@PathVariable UUID orderId) {
+        return reports.finalizeReport(orderId);
     }
 }

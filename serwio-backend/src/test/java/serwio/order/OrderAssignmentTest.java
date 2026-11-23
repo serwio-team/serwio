@@ -659,6 +659,103 @@ class OrderAssignmentTest {
     }
 
     @Test
+    void reportFinalizationValidatesFieldsThenEnablesClosingAndHistoricalRead() throws Exception {
+        var company = login(companyA);
+        var ownerSession = login(owner);
+        var author = login(technicianLogin);
+        var colleague = login(t2.getUser());
+        var outsider = technician(account("TECHNICIAN", "ACTIVE"), a1, "Nowy członek oddziału A2", true);
+        var outsiderSession = login(outsider.getUser());
+        var path = reportPath(orderId);
+        var visitId = confirmVisit(company, List.of(t1.getId()), t1, nextTuesday(9));
+        recordVisitResult(orderId, visitId, author, "COMPLETED");
+
+        orderAction(orderId, "close", company).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REPORT_NOT_FINALIZED"));
+        finalizeReportRequest(author).andExpect(status().isNotFound());
+        putReport(author, Map.of("actionsDone", "  ", "diagnosis", "  ", "resolution", "\n"))
+                .andExpect(status().isOk());
+        finalizeReportRequest(author).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.actionsDone").isArray())
+                .andExpect(jsonPath("$.errors.diagnosis").isArray())
+                .andExpect(jsonPath("$.errors.resolution").isArray());
+        assertThat(reports.existsByServiceOrderIdAndFinalizedAtIsNotNull(orderId)).isFalse();
+        putReport(author, validReport()).andExpect(status().isOk());
+        finalizeReportRequest(colleague).andExpect(status().isForbidden());
+        finalizeReportRequest(ownerSession).andExpect(status().isForbidden());
+        mvc.perform(post(path + "/finalize").session(author)).andExpect(status().isForbidden());
+        finalizeReportRequest(author).andExpect(status().isOk()).andExpect(jsonPath("$.finalizedAt").isString());
+        var finalized = reports.findByServiceOrderId(orderId).orElseThrow().getFinalizedAt();
+        finalizeReportRequest(author).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REPORT_ALREADY_FINALIZED"));
+        putReport(author, Map.of("actionsDone", "Zmieniono"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("REPORT_ALREADY_FINALIZED"));
+        assertThat(reports.findByServiceOrderId(orderId).orElseThrow().getFinalizedAt()).isEqualTo(finalized);
+
+        mvc.perform(get(orderPath(orderId)).session(company)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentStatus").value("COMPLETED"))
+                .andExpect(jsonPath("$.reportFinalized").value(true));
+        mvc.perform(get(path).session(ownerSession)).andExpect(status().isOk());
+        mvc.perform(get(path).session(login(companyB))).andExpect(status().isNotFound());
+        mvc.perform(get(path).session(login(tb1.getUser()))).andExpect(status().isNotFound());
+        orderAction(orderId, "close", company).andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentStatus").value("CLOSED"));
+        moveTechnician(company, t2, a1);
+        moveTechnician(company, outsider, a2);
+        for (var reader : List.of(company, ownerSession, author, colleague)) {
+            mvc.perform(get(path).session(reader)).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.actionsDone").value(validReport().get("actionsDone")))
+                    .andExpect(jsonPath("$.finalizedAt").isString());
+        }
+        mvc.perform(get(path).session(outsiderSession)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void reportFinalizationRequiresCompletedOrderAndCompletedVisitOnItsOwnOrder() throws Exception {
+        var company = login(companyA);
+        var author = login(technicianLogin);
+        var coordinator = login(t2.getUser());
+        put(company, body(0, List.of(a2.getId()), List.of(t1.getId()), t1.getId())).andExpect(status().isOk());
+        putReport(author, validReport()).andExpect(status().isOk());
+        finalizeReportRequest(author).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_ORDER_STATE"));
+
+        var cancelled = postDraft(orderId, company, List.of(t1.getId()), t1.getId());
+        var visitsPath = orderPath(orderId) + "/visits/";
+        mvc.perform(post(visitsPath + cancelled + "/cancel").session(company).with(csrf()))
+                .andExpect(status().isOk());
+        var planned = nextTuesday(9);
+        var completed = postDraft(orderId, company, List.of(t2.getId()), t2.getId());
+        confirmDraft(completed, t2, planned);
+        var otherOrder = newOrder(firmA, "NEW", serviceObject).getId();
+        var otherVisit = createDraft(otherOrder, company, List.of(t1.getId()), t1.getId());
+        var otherProposalPath = orderPath(otherOrder) + "/visits/" + otherVisit + "/proposals";
+        var otherProposal = propose(otherProposalPath, author, planned.plusHours(1));
+        mvc.perform(post(otherProposalPath + "/" + otherProposal + "/accept").session(login(owner)).with(csrf()))
+                .andExpect(status().isOk());
+        recordVisitResult(otherOrder, otherVisit, author, "COMPLETED");
+        recordVisitResult(orderId, completed, coordinator, "COMPLETED");
+        finalizeReportRequest(author).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REPORT_AUTHOR_NOT_PARTICIPANT"));
+        assertThat(reports.existsByServiceOrderIdAndFinalizedAtIsNotNull(orderId)).isFalse();
+    }
+
+    private ResultActions finalizeReportRequest(MockHttpSession session) throws Exception {
+        return mvc.perform(post(reportPath(orderId) + "/finalize").session(session).with(csrf()));
+    }
+
+    private void recordVisitResult(UUID id, UUID visitId, MockHttpSession coordinator, String outcome) throws Exception {
+        var path = orderPath(id) + "/visits/" + visitId;
+        mvc.perform(post(path + "/start").session(coordinator).with(csrf())).andExpect(status().isOk());
+        visitWrite(post(path + "/complete"), coordinator, Map.of("outcome", outcome)).andExpect(status().isOk());
+    }
+
+    private static Map<String, Object> validReport() {
+        return Map.of("actionsDone", "Oczyszczono filtr", "diagnosis", "Zabrudzony filtr",
+                "resolution", "Sprawdzono przepływ po czyszczeniu");
+    }
+
+    @Test
     void orderClosingRequiresCompletedWorkAndTheOrdersFinalReport() throws Exception {
         var company = login(companyA);
         var ownerSession = login(owner);

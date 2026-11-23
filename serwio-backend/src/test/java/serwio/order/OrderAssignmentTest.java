@@ -1,6 +1,7 @@
 package serwio.order;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.DayOfWeek;
@@ -831,6 +832,101 @@ class OrderAssignmentTest {
     private int reportAuthorChanges(UUID reportId) {
         return jdbc.queryForObject("select count(*) from report_author_history where service_report_id = ?",
                 Integer.class, reportId);
+    }
+
+    @Test
+    void reportConcurrentFirstWritesUseTheSameReportAndOnlyOneFinalizationSucceeds() throws Exception {
+        var company = login(companyA);
+        var first = login(technicianLogin);
+        var second = login(technicianLogin);
+        var visit = confirmVisit(company, List.of(t1.getId()), t1, nextTuesday(9));
+        recordVisitResult(orderId, visit, first, "COMPLETED");
+
+        var writes = concurrently(() -> putReport(first, validReport()).andReturn(),
+                () -> putReport(second, validReport()).andReturn());
+        assertThat(writes).allMatch(result -> result.getResponse().getStatus() == 200);
+        var reportId = reports.findByServiceOrderId(orderId).orElseThrow().getId().toString();
+        for (var write : writes) {
+            assertThat(mapper.readTree(write.getResponse().getContentAsString()).get("id").asText()).isEqualTo(reportId);
+        }
+        assertThat(count("service_report")).isEqualTo(1);
+
+        var finalizations = concurrently(() -> finalizeReportRequest(first).andReturn(),
+                () -> finalizeReportRequest(second).andReturn());
+        assertThat(finalizations).extracting(result -> result.getResponse().getStatus()).containsExactlyInAnyOrder(200, 409);
+        var sent = finalizations.stream().filter(result -> result.getResponse().getStatus() == 200).findFirst().orElseThrow();
+        var finalizedAt = mapper.readTree(sent.getResponse().getContentAsString()).get("finalizedAt").asText();
+        var stored = reports.findByServiceOrderId(orderId).orElseThrow().getFinalizedAt();
+        assertThat(Duration.between(stored, OffsetDateTime.parse(finalizedAt)).abs()).isLessThan(Duration.ofNanos(1_000));
+    }
+
+    @Test
+    void reportConcurrentDraftWriteCannotChangeAnAlreadyFinalReport() throws Exception {
+        var company = login(companyA);
+        var writer = login(technicianLogin);
+        var finalizer = login(technicianLogin);
+        var visit = confirmVisit(company, List.of(t1.getId()), t1, nextTuesday(9));
+        recordVisitResult(orderId, visit, writer, "COMPLETED");
+        putReport(writer, validReport()).andExpect(status().isOk());
+        var replacement = new HashMap<>(validReport());
+        replacement.put("actionsDone", "Dodatkowa kontrola filtra");
+        var codes = concurrently(() -> putReport(writer, replacement).andReturn().getResponse().getStatus(),
+                () -> finalizeReportRequest(finalizer).andReturn().getResponse().getStatus());
+        assertThat(codes.getLast()).isEqualTo(200);
+        assertThat(codes.getFirst()).isIn(200, 409);
+        var report = reports.findByServiceOrderId(orderId).orElseThrow();
+        assertThat(report.getFinalizedAt()).isNotNull();
+        assertThat(report.getActionsDone()).isEqualTo((codes.getFirst() == 200 ? replacement : validReport()).get("actionsDone"));
+    }
+
+    @Test
+    void reportConcurrentAuthorChangeAndFinalizationHaveOneWinner() throws Exception {
+        var company = login(companyA);
+        var original = login(technicianLogin);
+        var selected = login(t2.getUser());
+        var visit = confirmVisit(company, List.of(t1.getId(), t2.getId()), t1, nextTuesday(9));
+        recordVisitResult(orderId, visit, original, "COMPLETED");
+        putReport(original, validReport()).andExpect(status().isOk());
+
+        var codes = concurrently(() -> assignReportAuthor(company, t2).andReturn().getResponse().getStatus(),
+                () -> finalizeReportRequest(original).andReturn().getResponse().getStatus());
+        var report = reports.findByServiceOrderId(orderId).orElseThrow();
+        if (codes.getFirst() == 204) {
+            assertThat(codes).containsExactly(204, 403);
+            assertThat(report.getFinalizedAt()).isNull();
+            assertThat(reportAuthorChanges(report.getId())).isEqualTo(1);
+            finalizeReportRequest(selected).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.authorTechnicianId").value(t2.getId().toString()));
+        } else {
+            assertThat(codes).containsExactly(409, 200);
+            assertThat(report.getFinalizedAt()).isNotNull();
+            assertThat(reportAuthorChanges(report.getId())).isZero();
+        }
+    }
+
+    @Test
+    void reportConcurrentFinalizationAndClosingUseTheSameOrderLock() throws Exception {
+        var company = login(companyA);
+        var author = login(technicianLogin);
+        var visit = confirmVisit(company, List.of(t1.getId()), t1, nextTuesday(9));
+        recordVisitResult(orderId, visit, author, "COMPLETED");
+        putReport(author, validReport()).andExpect(status().isOk());
+
+        var results = concurrently(() -> orderAction(orderId, "close", company).andReturn(),
+                () -> finalizeReportRequest(author).andReturn());
+        assertThat(results.getLast().getResponse().getStatus()).isEqualTo(200);
+        var closeStatus = results.getFirst().getResponse().getStatus();
+        if (closeStatus == 409) {
+            var problem = mapper.readTree(results.getFirst().getResponse().getContentAsString());
+            assertThat(problem.path("code").asText()).isEqualTo("REPORT_NOT_FINALIZED");
+            orderAction(orderId, "close", company).andExpect(status().isOk());
+        } else {
+            assertThat(closeStatus).isEqualTo(200);
+        }
+        var finalizedAt = reports.findByServiceOrderId(orderId).orElseThrow().getFinalizedAt();
+        var closedAt = orders.findById(orderId).orElseThrow().getClosedAt();
+        assertThat(closedAt.toInstant()).isAfterOrEqualTo(finalizedAt.toInstant());
+        assertThat(statusHistory()).endsWith("IN_PROGRESS", "COMPLETED", "CLOSED");
     }
 
     private static Map<String, Object> validReport() {

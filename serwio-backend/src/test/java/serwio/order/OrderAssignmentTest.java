@@ -592,6 +592,73 @@ class OrderAssignmentTest {
     }
 
     @Test
+    void reportDraftHasOneAuthorAndSupportsResumingAnIncompleteReport() throws Exception {
+        var company = login(companyA);
+        var ownerSession = login(owner);
+        var author = login(technicianLogin);
+        var otherTechnician = login(t2.getUser());
+        var path = reportPath(orderId);
+        put(company, body(0, List.of(a2.getId()), List.of(t1.getId()), t1.getId())).andExpect(status().isOk());
+
+        mvc.perform(get(path)).andExpect(status().isUnauthorized());
+        mvc.perform(get(path).session(author)).andExpect(status().isNotFound());
+        mvc.perform(putRequest(path, Map.of()).session(author)).andExpect(status().isForbidden());
+        putReport(ownerSession, Map.of()).andExpect(status().isForbidden());
+        putReport(company, Map.of()).andExpect(status().isForbidden());
+        putReport(otherTechnician, Map.of()).andExpect(status().isForbidden());
+        putReport(author, Map.of("actionsDone", "a".repeat(ServiceReport.MAX_TEXT_LENGTH + 1)))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors.actionsDone").isArray());
+        assertThat(reports.findByServiceOrderId(orderId)).isEmpty();
+
+        var created = putReport(author, Map.of("actionsDone", "  Oczyszczono filtr.  ", "diagnosis", "  "))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.authorTechnicianId").value(t1.getId().toString()))
+                .andExpect(jsonPath("$.serviceOrderId").value(orderId.toString()))
+                .andExpect(jsonPath("$.actionsDone").value("Oczyszczono filtr."))
+                .andExpect(jsonPath("$.diagnosis").value(nullValue()))
+                .andExpect(jsonPath("$.finalizedAt").value(nullValue())).andReturn();
+        var reportId = mapper.readTree(created.getResponse().getContentAsString()).get("id").asText();
+        for (var hidden : List.of(company, ownerSession, otherTechnician, login(companyB))) {
+            mvc.perform(get(path).session(hidden)).andExpect(status().isNotFound());
+        }
+        mvc.perform(get(path).session(author)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(reportId))
+                .andExpect(jsonPath("$.actionsDone").value("Oczyszczono filtr."));
+
+        putReport(author, Map.of("diagnosis", "Zużyty filtr", "usedMaterials", "Nowy filtr"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(reportId))
+                .andExpect(jsonPath("$.actionsDone").value(nullValue()))
+                .andExpect(jsonPath("$.diagnosis").value("Zużyty filtr"))
+                .andExpect(jsonPath("$.usedMaterials").value("Nowy filtr"));
+        assertThat(count("service_report")).isEqualTo(1);
+    }
+
+    @Test
+    void reportDraftAuthorDoesNotChangeWithTheOrderCoordinatorAndStillNeedsCurrentAccess() throws Exception {
+        var company = login(companyA);
+        var author = login(technicianLogin);
+        var newCoordinator = login(t2.getUser());
+        put(company, body(0, List.of(a2.getId()), List.of(t1.getId()), t1.getId())).andExpect(status().isOk());
+        putReport(author, Map.of("actionsDone", "Próba działania")).andExpect(status().isOk());
+        put(company, body(1, List.of(a2.getId()), List.of(t1.getId()), t2.getId())).andExpect(status().isOk());
+        putReport(newCoordinator, Map.of()).andExpect(status().isForbidden());
+        putReport(author, Map.of("actionsDone", "Powtórzono próbę")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.authorTechnicianId").value(t1.getId().toString()));
+
+        put(company, body(2, List.of(a2.getId()), List.of(), t2.getId())).andExpect(status().isOk());
+        putReport(author, Map.of()).andExpect(status().isNotFound());
+        mvc.perform(get(reportPath(orderId)).session(author)).andExpect(status().isNotFound());
+        assertThat(reports.findByServiceOrderId(orderId).orElseThrow().getActionsDone()).isEqualTo("Powtórzono próbę");
+    }
+
+    private ResultActions putReport(MockHttpSession session, Map<String, Object> data) throws Exception {
+        return mvc.perform(putRequest(reportPath(orderId), data).session(session).with(csrf()));
+    }
+
+    private static String reportPath(UUID id) {
+        return orderPath(id) + "/report";
+    }
+
+    @Test
     void orderClosingRequiresCompletedWorkAndTheOrdersFinalReport() throws Exception {
         var company = login(companyA);
         var ownerSession = login(owner);

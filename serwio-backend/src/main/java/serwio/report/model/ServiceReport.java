@@ -30,6 +30,7 @@ import serwio.technician.model.Technician;
 @Setter
 @NoArgsConstructor
 public class ServiceReport {
+    public static final int MAX_TEXT_LENGTH = 100_000;
 
     @jakarta.validation.constraints.AssertTrue(message = "Finalny raport wymaga czynności, diagnozy i rozwiązania")
     @jakarta.persistence.Transient
@@ -57,23 +58,23 @@ public class ServiceReport {
     private Technician authorTechnician;
 
     @Column(name = "actions_done", nullable = true, unique = false, columnDefinition = "text")
-    @Size(max = 100000)
+    @Size(max = MAX_TEXT_LENGTH)
     private String actionsDone;
 
     @Column(name = "diagnosis", nullable = true, unique = false, columnDefinition = "text")
-    @Size(max = 100000)
+    @Size(max = MAX_TEXT_LENGTH)
     private String diagnosis;
 
     @Column(name = "resolution", nullable = true, unique = false, columnDefinition = "text")
-    @Size(max = 100000)
+    @Size(max = MAX_TEXT_LENGTH)
     private String resolution;
 
     @Column(name = "used_materials", nullable = true, unique = false, columnDefinition = "text")
-    @Size(max = 100000)
+    @Size(max = MAX_TEXT_LENGTH)
     private String usedMaterials;
 
     @Column(name = "recommendations", nullable = true, unique = false, columnDefinition = "text")
-    @Size(max = 100000)
+    @Size(max = MAX_TEXT_LENGTH)
     private String recommendations;
 
     @Column(name = "created_at", nullable = false, unique = false, columnDefinition = "timestamp with time zone")

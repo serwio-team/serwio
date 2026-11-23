@@ -75,6 +75,9 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, UUID
     @Query("select o from ServiceOrder o where o.id = :id and " + TECHNICIAN_ACCESS)
     Optional<ServiceOrder> findForUpdateByIdForTechnician(UUID id, UUID userId);
 
+    @Query("select count(o) > 0 from ServiceOrder o where o.id = :id and " + TECHNICIAN_ACCESS)
+    boolean hasCurrentTechnicianAccess(UUID id, UUID userId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select o from ServiceOrder o where o.id = :id and exists (

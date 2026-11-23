@@ -91,8 +91,8 @@ function request(url: string, init?: RequestInit): Promise<Response> {
   return MOCK_SERVICE_ORDERS && url.startsWith('/api/service-orders') ? mockServiceOrderFetch(url, init) : fetch(url, init);
 }
 
-async function get<T>(url: string): Promise<T> {
-  const response = await request(url, { headers: { Accept: 'application/json' } });
+async function get<T>(url: string, fetcher = request): Promise<T> {
+  const response = await fetcher(url, { headers: { Accept: 'application/json' } });
   if (!response.ok) throw await toApiError(response);
   return readBody<T>(response);
 }
@@ -213,6 +213,10 @@ export const api = {
   listServiceOrders,
   createServiceOrder: (data: ServiceOrderRequest) => mutate<ServiceOrderResponse>('POST', '/api/service-orders', data),
   getServiceOrder: (id: string) => get<ServiceOrderResponse>(`/api/service-orders/${encodeURIComponent(id)}`),
+  listTechnicianServiceOrders: (page: number) =>
+    get<ServiceOrderListItemResponse[]>(`/api/service-orders?${pageQuery(page, PAGE_SIZE)}`, fetch),
+  getTechnicianServiceOrder: (id: string) =>
+    get<ServiceOrderResponse>(`/api/service-orders/${encodeURIComponent(id)}`, fetch),
 
   companySummary: () => get<CompanySummaryResponse>('/api/companies/me/summary'),
 

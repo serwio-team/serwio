@@ -1,28 +1,31 @@
 import { ArrowLeft, SearchX, ShieldAlert } from 'lucide-react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useOutletContext, useParams } from 'react-router-dom';
 import { ApiError, errorMessage } from '../api';
 import { EmptyState, ErrorState } from '../components/DataState';
 import { serviceOrderDescriptionLabel, serviceOrderTypeLabel } from '../components/ServiceOrderForm';
 import { ServiceOrderStatusBadge } from '../components/StatusBadge';
 import { useServiceOrder } from '../queries';
-import type { ServiceOrderResponse } from '../types';
+import type { ServiceOrderResponse, UserAccountResponse } from '../types';
 
 const formatDate = (value: string) =>
   new Date(value).toLocaleString('pl-PL', { dateStyle: 'long', timeStyle: 'short' });
 
 export function ServiceOrderDetailsPage() {
   const { id } = useParams<{ id: string }>();
-  const order = useServiceOrder(id);
+  const user = useOutletContext<UserAccountResponse>();
+  const technician = user.role === 'TECHNICIAN';
+  const order = useServiceOrder(id, technician ? user.id : undefined);
   const data = order.data;
 
   const backLink = (
-    <Link to="/orders" className="back-link">
-      <ArrowLeft size={14} aria-hidden /> Zlecenia
+    <Link to={technician ? '/technician/orders' : '/orders'} className="back-link">
+      <ArrowLeft size={14} aria-hidden /> {technician ? 'Moje zlecenia' : 'Zlecenia'}
     </Link>
   );
 
   if (order.isError) {
     const status = order.error instanceof ApiError ? order.error.status : 0;
+    if (technician && status === 401) return null;
     return (
       <>
         {backLink}
@@ -55,12 +58,12 @@ export function ServiceOrderDetailsPage() {
         </div>
       </header>
 
-      {data ? <OrderDetails order={data} /> : <OrderDetailsSkeleton />}
+      {data ? <OrderDetails order={data} technician={technician} /> : <OrderDetailsSkeleton />}
     </>
   );
 }
 
-function OrderDetails({ order }: { order: ServiceOrderResponse }) {
+function OrderDetails({ order, technician }: { order: ServiceOrderResponse; technician: boolean }) {
   return (
     <div className="details-layout">
       <section className="card details-card">
@@ -79,11 +82,13 @@ function OrderDetails({ order }: { order: ServiceOrderResponse }) {
             <dd><ServiceOrderStatusBadge status={order.currentStatus} /></dd>
           </div>
           <div>
-            <dt>Urządzenie</dt>
+            <dt>{technician ? 'Obiekt' : 'Urządzenie'}</dt>
             <dd>
-              <Link to={`/service-objects/${encodeURIComponent(order.serviceObjectId)}`} className="cell-link">
-                {order.serviceObjectName}
-              </Link>
+              {technician ? order.serviceObjectName : (
+                <Link to={`/service-objects/${encodeURIComponent(order.serviceObjectId)}`} className="cell-link">
+                  {order.serviceObjectName}
+                </Link>
+              )}
             </dd>
           </div>
           <div>
@@ -93,10 +98,17 @@ function OrderDetails({ order }: { order: ServiceOrderResponse }) {
               <span className="details-sub">{order.addressLine}, {order.city}</span>
             </dd>
           </div>
-          <div>
-            <dt>Właściciel</dt>
-            <dd>{order.assetOwnerName}</dd>
-          </div>
+          {technician ? (
+            <div>
+              <dt>Koordynator</dt>
+              <dd>{order.coordinatorDisplayName?.trim() || 'Nie przypisano'}</dd>
+            </div>
+          ) : (
+            <div>
+              <dt>Właściciel</dt>
+              <dd>{order.assetOwnerName}</dd>
+            </div>
+          )}
           <div>
             <dt>Utworzono</dt>
             <dd>{formatDate(order.createdAt)}</dd>

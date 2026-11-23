@@ -61,7 +61,7 @@ public class ServiceOrderService {
         entry.setChangedByUser(account);
         entry.setChangedAt(now);
         history.save(entry);
-        return response(order);
+        return response(order, false);
     }
 
     public List<ServiceOrderListItemResponse> list(OrderStatus status, int page, int size) {
@@ -69,8 +69,12 @@ public class ServiceOrderService {
         var role = role(userId);
         var pageable = PageRequest.of(page, size, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.asc("id")));
         var filter = status == null ? null : status.name();
-        var result = "ASSET_OWNER".equals(role) ? orders.findForOwner(userId, filter, pageable)
-                : orders.findForCompany(userId, filter, pageable);
+        var result = switch (role) {
+            case "ASSET_OWNER" -> orders.findForOwner(userId, filter, pageable);
+            case "SERVICE_COMPANY" -> orders.findForCompany(userId, filter, pageable);
+            case "TECHNICIAN" -> orders.findForTechnician(userId, filter, pageable);
+            default -> throw new AccessDeniedException("Brak dostępu do zleceń.");
+        };
         return result.getContent().stream().map(order -> new ServiceOrderListItemResponse(order.getId(),
                 order.getServiceObject().getId(), order.getServiceObject().getName(),
                 order.getServiceObject().getLocation().getId(), order.getServiceObject().getLocation().getName(),
@@ -80,25 +84,29 @@ public class ServiceOrderService {
     public ServiceOrderResponse get(UUID id) {
         var userId = currentUser.id();
         var role = role(userId);
-        var result = "ASSET_OWNER".equals(role) ? orders.findByIdAndServiceObjectLocationAssetOwnerUserId(id, userId)
-                : orders.findByIdAndServiceCompanyUserId(id, userId);
-        return response(result.orElseThrow(() -> new ResourceNotFoundException("Nie znaleziono zlecenia: " + id)));
+        var result = switch (role) {
+            case "ASSET_OWNER" -> orders.findByIdAndServiceObjectLocationAssetOwnerUserId(id, userId);
+            case "SERVICE_COMPANY" -> orders.findByIdAndServiceCompanyUserId(id, userId);
+            case "TECHNICIAN" -> orders.findByIdForTechnician(id, userId);
+            default -> throw new AccessDeniedException("Brak dostępu do zleceń.");
+        };
+        var order = result.orElseThrow(() -> new ResourceNotFoundException("Nie znaleziono zlecenia: " + id));
+        return response(order, "TECHNICIAN".equals(role));
     }
 
     private String role(UUID userId) {
-        var role = accounts.findById(userId).orElseThrow(() -> new AccessDeniedException("Brak konta użytkownika.")).getRole();
-        if (!"ASSET_OWNER".equals(role) && !"SERVICE_COMPANY".equals(role))
-            throw new AccessDeniedException("Brak dostępu do zleceń.");
-        return role;
+        return accounts.findById(userId).orElseThrow(() -> new AccessDeniedException("Brak konta użytkownika.")).getRole();
     }
 
-    private ServiceOrderResponse response(ServiceOrder order) {
+    private ServiceOrderResponse response(ServiceOrder order, boolean includeCoordinator) {
         var object = order.getServiceObject();
         var location = object.getLocation();
         var owner = location.getAssetOwner();
+        var coordinator = includeCoordinator ? order.getCoordinatorTechnician() : null;
         return new ServiceOrderResponse(order.getId(), object.getId(), object.getName(),
                 location.getId(), location.getName(), location.getAddressLine(), location.getCity(), location.getTimezone(),
                 owner.getId(), owner.getName(), order.getServiceCompany().getId(), order.getOrderType(),
-                order.getDescription(), order.getCurrentStatus(), order.getCreatedByUser().getId(), order.getCreatedAt(), order.getClosedAt());
+                order.getDescription(), order.getCurrentStatus(), order.getCreatedByUser().getId(), order.getCreatedAt(),
+                order.getClosedAt(), coordinator == null ? null : coordinator.getDisplayName());
     }
 }

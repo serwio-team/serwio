@@ -28,6 +28,8 @@ export const queryKeys = {
   serviceOrders: ['service-orders'] as const,
   serviceOrderList: (statuses: string[]) => ['service-orders', 'list', statuses.join(',')] as const,
   serviceOrder: (id: string) => ['service-orders', 'detail', id] as const,
+  technicianOrderList: (userId: string) => ['technician-orders', userId, 'list'] as const,
+  technicianOrder: (userId: string, id: string) => ['technician-orders', userId, 'detail', id] as const,
   companySummary: ['companies', 'me', 'summary'] as const,
   branches: ['branches'] as const,
   branchList: ['branches', 'list'] as const,
@@ -176,10 +178,19 @@ export function useServiceOrderList(statuses: string[]) {
   });
 }
 
-export function useServiceOrder(id: string | undefined) {
+export function useTechnicianServiceOrderList(userId: string) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.technicianOrderList(userId),
+    queryFn: ({ pageParam }) => api.listTechnicianServiceOrders(pageParam),
+    initialPageParam: 0,
+    getNextPageParam: nextPage,
+  });
+}
+
+export function useServiceOrder(id: string | undefined, technicianUserId?: string) {
   return useQuery({
-    queryKey: queryKeys.serviceOrder(id ?? ''),
-    queryFn: () => api.getServiceOrder(id!),
+    queryKey: technicianUserId ? queryKeys.technicianOrder(technicianUserId, id ?? '') : queryKeys.serviceOrder(id ?? ''),
+    queryFn: () => technicianUserId ? api.getTechnicianServiceOrder(id!) : api.getServiceOrder(id!),
     enabled: Boolean(id),
   });
 }

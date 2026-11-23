@@ -12,6 +12,7 @@ import serwio.testsupport.OrderApiFixture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -19,6 +20,27 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class VisitSchedulingTest extends OrderApiFixture {
+    @Test
+    void replacesVisitCoordinatorAndKeepsOnlySelectedStaffBeforeConfirmation() throws Exception {
+        var company = login(companyA);
+        put(company, body(0, List.of(a1.getId(), a2.getId()), List.of(), t1.getId())).andExpect(status().isOk());
+        var visitId = postDraft(orderId, company, List.of(t1.getId(), t2.getId()), t1.getId());
+        var visitPath = orderPath(orderId) + "/visits/" + visitId;
+        var sameStaffNewCoordinator = Map.<String, Object>of(
+                "technicianIds", List.of(t1.getId(), t2.getId()), "coordinatorTechnicianId", t2.getId());
+        mvc.perform(putRequest(visitPath + "/staffing", sameStaffNewCoordinator).session(company).with(csrf()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.coordinatorTechnicianId").value(t2.getId().toString()));
+        var single = Map.<String, Object>of("technicianIds", List.of(t2.getId()), "coordinatorTechnicianId", t2.getId());
+        mvc.perform(putRequest(visitPath + "/staffing", single).session(company).with(csrf()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.technicians[*].id", contains(t2.getId().toString())));
+        mvc.perform(putRequest(visitPath + "/staffing", sameStaffNewCoordinator).session(company).with(csrf()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.technicians[*].id", containsInAnyOrder(
+                        t1.getId().toString(), t2.getId().toString())));
+        confirmDraft(visitId, t2, nextTuesday(9));
+        mvc.perform(putRequest(visitPath + "/staffing", single).session(company).with(csrf()))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("INVALID_VISIT_STATE"));
+    }
+
 
     @Test
     void visitCandidatesUseCurrentAssignmentsAndOnlyCurrentCompanyCanRead() throws Exception {

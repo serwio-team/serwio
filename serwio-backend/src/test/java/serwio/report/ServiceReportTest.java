@@ -20,6 +20,25 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class ServiceReportTest extends OrderApiFixture {
+    @Test
+    void legacyOrderNeedsAnAuthorAndCancelledDraftRemainsPrivate() throws Exception {
+        var company = login(companyA);
+        var author = login(technicianLogin);
+        put(company, body(0, List.of(a1.getId()), List.of(t1.getId()), t1.getId())).andExpect(status().isOk());
+        jdbc.update("update service_order set coordinator_technician_id = null where id = ?", orderId);
+        putReport(author, validReport()).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REPORT_AUTHOR_NOT_ASSIGNED"));
+        put(company, body(1, List.of(a1.getId()), List.of(t1.getId()), t1.getId())).andExpect(status().isOk());
+        putReport(author, validReport()).andExpect(status().isOk());
+
+        orderAction(orderId, "cancel", company).andExpect(status().isOk());
+        mvc.perform(get(orderPath(orderId)).session(author)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentStatus").value("CANCELLED"));
+        mvc.perform(get(reportPath(orderId)).session(author)).andExpect(status().isNotFound());
+        assignReportAuthor(company, t1).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_ORDER_STATE"));
+    }
+
 
     @Test
     void reportDraftHasOneAuthorAndSupportsResumingAnIncompleteReport() throws Exception {

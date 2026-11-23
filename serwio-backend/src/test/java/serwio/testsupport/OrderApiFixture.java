@@ -215,7 +215,7 @@ public abstract class OrderApiFixture {
     }
 
     protected org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder putRequest(
-            String url, Map<String, Object> data) throws Exception {
+            String url, Map<String, ?> data) throws Exception {
         return org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(url)
                 .contentType("application/json").content(mapper.writeValueAsString(data));
     }

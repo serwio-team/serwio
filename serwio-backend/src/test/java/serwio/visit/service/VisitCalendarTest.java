@@ -60,6 +60,18 @@ class VisitCalendarTest {
                 .isInstanceOf(FieldValidationException.class);
     }
 
+    @Test
+    void availabilityRechecksTimeAtAcceptanceAndSupportsAZoneWithoutClockChanges() {
+        var utc = ZoneId.of("UTC");
+        var future = range("2026-12-01T09:00Z", "2026-12-01T10:00Z");
+        var officeHours = List.of(window(2, "08:00", "16:00"));
+        VisitCalendar.requireAvailable(future, utc, officeHours, NOW);
+        assertThatThrownBy(() -> VisitCalendar.requireAvailable(future, utc, officeHours, future.startsAt().toInstant()))
+                .isInstanceOf(VisitConflictException.class);
+        assertThatThrownBy(() -> VisitCalendar.requireAvailable(new VisitTimeRange(future.startsAt(), future.startsAt()),
+                utc, officeHours, NOW)).isInstanceOf(VisitConflictException.class);
+    }
+
     private static void available(VisitTimeRange range, LocationAvailability... windows) {
         VisitCalendar.requireAvailable(range, WARSAW, List.of(windows), NOW);
     }

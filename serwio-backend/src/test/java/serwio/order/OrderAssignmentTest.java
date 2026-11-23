@@ -42,6 +42,9 @@ import serwio.technician.repository.TechnicianRepository;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -50,6 +53,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class OrderAssignmentTest {
     private static final String PASSWORD = "test-password-123";
+    private static final String ORDERS_PATH = "/api/service-orders";
 
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
@@ -67,6 +71,8 @@ class OrderAssignmentTest {
 
     /** Firma A z dwoma aktywnymi i jednym nieaktywnym oddziałem, firma B z jednym oddziałem. */
     UserAccount companyA, companyB, owner, technicianLogin;
+    ServiceCompany firmA, firmB;
+    ServiceObject serviceObject;
     ServiceBranch a1, a2, aInactive, b1;
     Technician t1, t2, tInactive, tBlockedAccount, tb1;
     UUID orderId;
@@ -77,8 +83,8 @@ class OrderAssignmentTest {
             companyA = account("SERVICE_COMPANY", "ACTIVE");
             companyB = account("SERVICE_COMPANY", "ACTIVE");
             owner = account("ASSET_OWNER", "ACTIVE");
-            var firmA = company(companyA);
-            var firmB = company(companyB);
+            firmA = company(companyA);
+            firmB = company(companyB);
             a1 = branch(firmA, "A1 Warszawa", true);
             a2 = branch(firmA, "A2 Kraków", true);
             aInactive = branch(firmA, "A3 zamknięty", false);
@@ -89,7 +95,9 @@ class OrderAssignmentTest {
             tInactive = technician(account("TECHNICIAN", "ACTIVE"), a1, "Celina nieaktywna", false);
             tBlockedAccount = technician(account("TECHNICIAN", "BLOCKED"), a1, "Damian zablokowany", true);
             tb1 = technician(account("TECHNICIAN", "ACTIVE"), b1, "Ewa obca", true);
-            orderId = order(firmA, "NEW").getId();
+            var order = order(firmA, "NEW");
+            orderId = order.getId();
+            serviceObject = order.getServiceObject();
         });
     }
 
@@ -176,6 +184,89 @@ class OrderAssignmentTest {
                 .andExpect(jsonPath("$.coordinatorTechnicianId").value(t2.getId().toString()));
         assertThat(count("order_branch_assignment")).isEqualTo(2);
         assertThat(statusHistory()).containsExactly("ASSIGNED");
+    }
+
+    @Test
+    void technicianListFiltersBeforePagingAndDeduplicatesMixedAssignments() throws Exception {
+        var firmSession = login(companyA);
+        var technicianSession = login(technicianLogin);
+        var directOrderId = newOrder(firmA, "NEW", serviceObject).getId();
+        var assignedToOther = newOrder(firmA, "NEW", serviceObject).getId();
+        var unassigned = newOrder(firmA, "NEW", serviceObject).getId();
+        var teammate = account("TECHNICIAN", "ACTIVE");
+        var colleague = technician(teammate, a1, "Kolega z oddziału A1", true);
+
+        put(firmSession, body(0, List.of(a1.getId()), List.of(t1.getId()), t1.getId())).andExpect(status().isOk());
+        put(firmSession, body(0, List.of(), List.of(t1.getId()), t1.getId()), directOrderId).andExpect(status().isOk());
+        put(firmSession, body(0, List.of(), List.of(colleague.getId()), colleague.getId()), assignedToOther)
+                .andExpect(status().isOk());
+        jdbc.update("update service_order set created_at = ? where id in (?, ?)", now(), orderId, directOrderId);
+        jdbc.update("update service_order set current_status = 'AWAITING_TECHNICIAN_REVIEW' where id = ?", directOrderId);
+        jdbc.update("update service_order set created_at = ? where id = ?", now().plusMinutes(1), assignedToOther);
+
+        var visible = List.of(orderId.toString(), directOrderId.toString()).stream().sorted().toList();
+        mvc.perform(get(ORDERS_PATH).session(technicianSession)).andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].id", contains(visible.toArray(String[]::new))));
+        for (int page = 0; page < visible.size(); page++) {
+            mvc.perform(get(ORDERS_PATH).session(technicianSession).param("size", "1")
+                            .param("page", Integer.toString(page)))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$[*].id", contains(visible.get(page))));
+        }
+        mvc.perform(get(ORDERS_PATH).session(technicianSession).param("size", "1").param("page", "2"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$").isEmpty());
+        mvc.perform(get(ORDERS_PATH).session(technicianSession).param("status", "ASSIGNED").param("size", "1"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[*].id", contains(orderId.toString())))
+                .andExpect(jsonPath("$[0].serviceObjectName").value("Klimatyzator"))
+                .andExpect(jsonPath("$[0].locationName").value("Lokalizacja"));
+        mvc.perform(get(ORDERS_PATH).session(login(teammate))).andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].id", containsInAnyOrder(orderId.toString(), assignedToOther.toString())));
+        mvc.perform(get(ORDERS_PATH).session(firmSession)).andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].id", hasItem(unassigned.toString())));
+    }
+
+    @Test
+    void technicianListUsesCurrentBranchAndIgnoresEndedAssignments() throws Exception {
+        var firmSession = login(companyA);
+        var technicianSession = login(technicianLogin);
+        var directOrderId = newOrder(firmA, "NEW", serviceObject).getId();
+        put(firmSession, body(0, List.of(a1.getId()), List.of(), t1.getId())).andExpect(status().isOk());
+        put(firmSession, body(0, List.of(), List.of(t1.getId()), t1.getId()), directOrderId).andExpect(status().isOk());
+        mvc.perform(get(ORDERS_PATH).session(technicianSession)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+
+        mvc.perform(putRequest("/api/technicians/" + t1.getId(),
+                Map.of("branchId", a2.getId(), "displayName", t1.getDisplayName(), "active", true))
+                .session(firmSession).with(csrf())).andExpect(status().isOk());
+        mvc.perform(get(ORDERS_PATH).session(technicianSession)).andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].id", contains(directOrderId.toString())));
+
+        put(firmSession, body(1, List.of(), List.of(t2.getId()), t2.getId()), directOrderId).andExpect(status().isOk());
+        put(firmSession, body(1, List.of(a2.getId()), List.of(), t2.getId())).andExpect(status().isOk());
+        mvc.perform(get(ORDERS_PATH).session(technicianSession)).andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].id", contains(orderId.toString())));
+    }
+
+    @Test
+    void technicianListChecksCurrentActivityAndClosedOrders() throws Exception {
+        var firmSession = login(companyA);
+        var technicianSession = login(technicianLogin);
+        put(firmSession, body(0, List.of(), List.of(t1.getId()), t1.getId())).andExpect(status().isOk());
+        var closedOrderId = newOrder(firmA, "NEW", serviceObject).getId();
+        put(firmSession, body(0, List.of(), List.of(t1.getId()), t1.getId()), closedOrderId).andExpect(status().isOk());
+        jdbc.update("update service_order set closed_at = ? where id = ?", now(), closedOrderId);
+        mvc.perform(get(ORDERS_PATH).session(technicianSession)).andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].id", contains(orderId.toString())));
+
+        jdbc.update("update technician set active = false where id = ?", t1.getId());
+        mvc.perform(get(ORDERS_PATH).session(technicianSession)).andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+        jdbc.update("update technician set active = true where id = ?", t1.getId());
+        jdbc.update("update service_branch set active = false where id = ?", a1.getId());
+        mvc.perform(get(ORDERS_PATH).session(technicianSession)).andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+        jdbc.update("update service_branch set active = true where id = ?", a1.getId());
+        jdbc.update("update user_account set status = 'BLOCKED' where id = ?", technicianLogin.getId());
+        mvc.perform(get(ORDERS_PATH).session(technicianSession)).andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -306,7 +397,7 @@ class OrderAssignmentTest {
     }
 
     private static String path(UUID id) {
-        return "/api/service-orders/" + id + "/assignment";
+        return ORDERS_PATH + "/" + id + "/assignment";
     }
 
     private int count(String table) {
@@ -394,6 +485,10 @@ class OrderAssignmentTest {
         object.setActive(true);
         object.setCreatedAt(now());
         objects.save(object);
+        return newOrder(company, status, object);
+    }
+
+    private ServiceOrder newOrder(ServiceCompany company, String status, ServiceObject object) {
         var order = new ServiceOrder();
         order.setServiceObject(object);
         order.setServiceCompany(company);

@@ -69,8 +69,12 @@ public class ServiceOrderService {
         var role = role(userId);
         var pageable = PageRequest.of(page, size, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.asc("id")));
         var filter = status == null ? null : status.name();
-        var result = "ASSET_OWNER".equals(role) ? orders.findForOwner(userId, filter, pageable)
-                : orders.findForCompany(userId, filter, pageable);
+        var result = switch (role) {
+            case "ASSET_OWNER" -> orders.findForOwner(userId, filter, pageable);
+            case "SERVICE_COMPANY" -> orders.findForCompany(userId, filter, pageable);
+            case "TECHNICIAN" -> orders.findForTechnician(userId, filter, pageable);
+            default -> throw new AccessDeniedException("Brak dostępu do zleceń.");
+        };
         return result.getContent().stream().map(order -> new ServiceOrderListItemResponse(order.getId(),
                 order.getServiceObject().getId(), order.getServiceObject().getName(),
                 order.getServiceObject().getLocation().getId(), order.getServiceObject().getLocation().getName(),
@@ -80,16 +84,16 @@ public class ServiceOrderService {
     public ServiceOrderResponse get(UUID id) {
         var userId = currentUser.id();
         var role = role(userId);
-        var result = "ASSET_OWNER".equals(role) ? orders.findByIdAndServiceObjectLocationAssetOwnerUserId(id, userId)
-                : orders.findByIdAndServiceCompanyUserId(id, userId);
+        var result = switch (role) {
+            case "ASSET_OWNER" -> orders.findByIdAndServiceObjectLocationAssetOwnerUserId(id, userId);
+            case "SERVICE_COMPANY" -> orders.findByIdAndServiceCompanyUserId(id, userId);
+            default -> throw new AccessDeniedException("Brak dostępu do zleceń.");
+        };
         return response(result.orElseThrow(() -> new ResourceNotFoundException("Nie znaleziono zlecenia: " + id)));
     }
 
     private String role(UUID userId) {
-        var role = accounts.findById(userId).orElseThrow(() -> new AccessDeniedException("Brak konta użytkownika.")).getRole();
-        if (!"ASSET_OWNER".equals(role) && !"SERVICE_COMPANY".equals(role))
-            throw new AccessDeniedException("Brak dostępu do zleceń.");
-        return role;
+        return accounts.findById(userId).orElseThrow(() -> new AccessDeniedException("Brak konta użytkownika.")).getRole();
     }
 
     private ServiceOrderResponse response(ServiceOrder order) {

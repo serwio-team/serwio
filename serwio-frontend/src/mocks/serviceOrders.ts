@@ -10,7 +10,10 @@ import type {
 
 const STORAGE_KEY = 'serwio:mock-service-orders';
 const ORDER_TYPES = ['REPAIR', 'INSPECTION'];
-const QUERY_STATUSES = ['NEW', 'AWAITING_TECHNICIAN_REVIEW', 'AWAITING_OWNER_CONFIRMATION'];
+const QUERY_STATUSES = [
+  'NEW', 'ASSIGNED', 'AWAITING_SCHEDULING', 'VISIT_CONFIRMED', 'IN_PROGRESS', 'REVISIT_REQUIRED', 'COMPLETED',
+  'AWAITING_TECHNICIAN_REVIEW', 'AWAITING_OWNER_CONFIRMATION', 'CLOSED', 'CANCELLED',
+];
 const MAX_DESCRIPTION_LENGTH = 100000;
 
 function json(status: number, body: unknown): Response {
@@ -100,6 +103,7 @@ async function create(body: Record<string, unknown>): Promise<Response> {
     createdByUserId: user.data!.id,
     createdAt: new Date().toISOString(),
     closedAt: null,
+    reportFinalized: false,
   };
   save(order);
   return json(201, order);

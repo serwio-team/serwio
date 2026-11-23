@@ -14,6 +14,7 @@ const base = {
   createdByUserId: '00000000-0000-0000-0000-000000000501',
   currentStatus: 'NEW',
   closedAt: null,
+  reportFinalized: false,
 };
 
 export const serviceOrderFixtures = {
@@ -74,6 +75,7 @@ export const serviceOrderHistoryFixtures: ServiceOrderResponse[] = Array.from({ 
     currentStatus: status,
     createdAt: new Date(createdAt).toISOString(),
     closedAt: finished ? new Date(createdAt + 2 * DAY).toISOString() : null,
+    reportFinalized: status === 'CLOSED',
   };
 });
 

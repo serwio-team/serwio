@@ -22,6 +22,9 @@ const SERVICE_ORDER_STATUS: Record<ServiceOrderStatus, { label: string; tone: st
   ASSIGNED: { label: 'Przypisane', tone: 'info' },
   AWAITING_SCHEDULING: { label: 'Uzgadnianie terminu', tone: 'warning' },
   VISIT_CONFIRMED: { label: 'Wizyta potwierdzona', tone: 'success' },
+  IN_PROGRESS: { label: 'W trakcie realizacji', tone: 'info' },
+  REVISIT_REQUIRED: { label: 'Wymaga ponownej wizyty', tone: 'warning' },
+  COMPLETED: { label: 'Wykonane', tone: 'success' },
   AWAITING_TECHNICIAN_REVIEW: { label: 'Oczekuje na serwisanta', tone: 'warning' },
   AWAITING_OWNER_CONFIRMATION: { label: 'Oczekuje na potwierdzenie właściciela', tone: 'warning' },
   CLOSED: { label: 'Zamknięte', tone: 'success' },
@@ -29,7 +32,7 @@ const SERVICE_ORDER_STATUS: Record<ServiceOrderStatus, { label: string; tone: st
 };
 
 export const ACTIVE_ORDER_STATUSES: ServiceOrderStatus[] = [
-  'NEW', 'ASSIGNED', 'AWAITING_SCHEDULING', 'VISIT_CONFIRMED',
+  'NEW', 'ASSIGNED', 'AWAITING_SCHEDULING', 'VISIT_CONFIRMED', 'IN_PROGRESS', 'REVISIT_REQUIRED', 'COMPLETED',
   'AWAITING_TECHNICIAN_REVIEW', 'AWAITING_OWNER_CONFIRMATION',
 ];
 

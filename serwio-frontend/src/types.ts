@@ -186,6 +186,9 @@ export type ServiceOrderStatus =
   | 'ASSIGNED'
   | 'AWAITING_SCHEDULING'
   | 'VISIT_CONFIRMED'
+  | 'IN_PROGRESS'
+  | 'REVISIT_REQUIRED'
+  | 'COMPLETED'
   | 'AWAITING_TECHNICIAN_REVIEW'
   | 'AWAITING_OWNER_CONFIRMATION'
   | 'CLOSED'
@@ -226,6 +229,7 @@ export interface ServiceOrderResponse {
   createdByUserId: string;
   createdAt: string;
   closedAt: string | null;
+  reportFinalized: boolean;
 }
 
 export interface TechnicianServiceOrderResponse extends ServiceOrderListItemResponse {

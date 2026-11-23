@@ -3,6 +3,7 @@ package serwio.order.service;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -61,7 +62,7 @@ public class ServiceOrderService {
         entry.setChangedByUser(account);
         entry.setChangedAt(now);
         history.save(entry);
-        return response(order, false);
+        return response(order);
     }
 
     public List<ServiceOrderListItemResponse> list(OrderStatus status, int page, int size) {
@@ -81,32 +82,39 @@ public class ServiceOrderService {
                 order.getOrderType(), order.getCurrentStatus(), order.getCreatedAt())).toList();
     }
 
-    public ServiceOrderResponse get(UUID id) {
+    public ServiceOrderDetailsResponse get(UUID id) {
         var userId = currentUser.id();
-        var role = role(userId);
-        var result = switch (role) {
-            case "ASSET_OWNER" -> orders.findByIdAndServiceObjectLocationAssetOwnerUserId(id, userId);
-            case "SERVICE_COMPANY" -> orders.findByIdAndServiceCompanyUserId(id, userId);
-            case "TECHNICIAN" -> orders.findByIdForTechnician(id, userId);
+        Optional<ServiceOrderDetailsResponse> result = switch (role(userId)) {
+            case "ASSET_OWNER" -> orders.findByIdAndServiceObjectLocationAssetOwnerUserId(id, userId).map(this::response);
+            case "SERVICE_COMPANY" -> orders.findByIdAndServiceCompanyUserId(id, userId).map(this::response);
+            case "TECHNICIAN" -> orders.findByIdForTechnician(id, userId).map(this::technicianResponse);
             default -> throw new AccessDeniedException("Brak dostępu do zleceń.");
         };
-        var order = result.orElseThrow(() -> new ResourceNotFoundException("Nie znaleziono zlecenia: " + id));
-        return response(order, "TECHNICIAN".equals(role));
+        return result.orElseThrow(() -> new ResourceNotFoundException("Nie znaleziono zlecenia: " + id));
     }
 
     private String role(UUID userId) {
         return accounts.findById(userId).orElseThrow(() -> new AccessDeniedException("Brak konta użytkownika.")).getRole();
     }
 
-    private ServiceOrderResponse response(ServiceOrder order, boolean includeCoordinator) {
+    private ServiceOrderResponse response(ServiceOrder order) {
         var object = order.getServiceObject();
         var location = object.getLocation();
         var owner = location.getAssetOwner();
-        var coordinator = includeCoordinator ? order.getCoordinatorTechnician() : null;
         return new ServiceOrderResponse(order.getId(), object.getId(), object.getName(),
                 location.getId(), location.getName(), location.getAddressLine(), location.getCity(), location.getTimezone(),
                 owner.getId(), owner.getName(), order.getServiceCompany().getId(), order.getOrderType(),
-                order.getDescription(), order.getCurrentStatus(), order.getCreatedByUser().getId(), order.getCreatedAt(),
-                order.getClosedAt(), coordinator == null ? null : coordinator.getDisplayName());
+                order.getDescription(), order.getCurrentStatus(), order.getCreatedByUser().getId(), order.getCreatedAt(), order.getClosedAt());
+    }
+
+    private TechnicianServiceOrderResponse technicianResponse(ServiceOrder order) {
+        var object = order.getServiceObject();
+        var location = object.getLocation();
+        var technician = order.getCoordinatorTechnician();
+        var coordinator = technician == null ? null
+                : new TechnicianServiceOrderResponse.Coordinator(technician.getId(), technician.getDisplayName());
+        return new TechnicianServiceOrderResponse(order.getId(), object.getId(), object.getName(), location.getId(),
+                location.getName(), location.getAddressLine(), location.getCity(), location.getTimezone(),
+                order.getOrderType(), order.getDescription(), order.getCurrentStatus(), order.getCreatedAt(), coordinator);
     }
 }

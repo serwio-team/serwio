@@ -5,7 +5,7 @@ import { EmptyState, ErrorState } from '../components/DataState';
 import { serviceOrderDescriptionLabel, serviceOrderTypeLabel } from '../components/ServiceOrderForm';
 import { ServiceOrderStatusBadge } from '../components/StatusBadge';
 import { useServiceOrder } from '../queries';
-import type { ServiceOrderResponse, UserAccountResponse } from '../types';
+import type { ServiceOrderResponse, TechnicianServiceOrderResponse, UserAccountResponse } from '../types';
 
 const formatDate = (value: string) =>
   new Date(value).toLocaleString('pl-PL', { dateStyle: 'long', timeStyle: 'short' });
@@ -63,7 +63,13 @@ export function ServiceOrderDetailsPage() {
   );
 }
 
-function OrderDetails({ order, technician }: { order: ServiceOrderResponse; technician: boolean }) {
+function OrderDetails({ order, technician }: {
+  order: ServiceOrderResponse | TechnicianServiceOrderResponse;
+  technician: boolean;
+}) {
+  const coordinatorName = 'coordinator' in order ? order.coordinator?.displayName.trim() : undefined;
+  const closedAt = 'closedAt' in order ? order.closedAt : null;
+
   return (
     <div className="details-layout">
       <section className="card details-card">
@@ -101,9 +107,9 @@ function OrderDetails({ order, technician }: { order: ServiceOrderResponse; tech
           {technician ? (
             <div>
               <dt>Koordynator</dt>
-              <dd>{order.coordinatorDisplayName?.trim() || 'Nie przypisano'}</dd>
+              <dd>{coordinatorName || 'Nie przypisano'}</dd>
             </div>
-          ) : (
+          ) : 'assetOwnerName' in order && (
             <div>
               <dt>Właściciel</dt>
               <dd>{order.assetOwnerName}</dd>
@@ -113,10 +119,10 @@ function OrderDetails({ order, technician }: { order: ServiceOrderResponse; tech
             <dt>Utworzono</dt>
             <dd>{formatDate(order.createdAt)}</dd>
           </div>
-          {order.closedAt && (
+          {closedAt && (
             <div>
               <dt>Zakończono</dt>
-              <dd>{formatDate(order.closedAt)}</dd>
+              <dd>{formatDate(closedAt)}</dd>
             </div>
           )}
         </dl>

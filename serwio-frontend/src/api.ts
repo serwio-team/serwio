@@ -22,6 +22,7 @@ import type {
   TechnicianPasswordRequest,
   TechnicianProfileResponse,
   TechnicianResponse,
+  TechnicianServiceOrderResponse,
   TechnicianUpdateRequest,
   UserAccountResponse,
 } from './types';
@@ -216,7 +217,7 @@ export const api = {
   listTechnicianServiceOrders: (page: number) =>
     get<ServiceOrderListItemResponse[]>(`/api/service-orders?${pageQuery(page, PAGE_SIZE)}`, fetch),
   getTechnicianServiceOrder: (id: string) =>
-    get<ServiceOrderResponse>(`/api/service-orders/${encodeURIComponent(id)}`, fetch),
+    get<TechnicianServiceOrderResponse>(`/api/service-orders/${encodeURIComponent(id)}`, fetch),
 
   companySummary: () => get<CompanySummaryResponse>('/api/companies/me/summary'),
 

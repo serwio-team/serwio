@@ -7,8 +7,10 @@ import type {
   ServiceBranchRequest,
   ServiceObjectRequest,
   ServiceOrderRequest,
+  ServiceOrderResponse,
   TechnicianCreateRequest,
   TechnicianPasswordRequest,
+  TechnicianServiceOrderResponse,
   TechnicianUpdateRequest,
 } from './types';
 
@@ -188,7 +190,7 @@ export function useTechnicianServiceOrderList(userId: string) {
 }
 
 export function useServiceOrder(id: string | undefined, technicianUserId?: string) {
-  return useQuery({
+  return useQuery<ServiceOrderResponse | TechnicianServiceOrderResponse>({
     queryKey: technicianUserId ? queryKeys.technicianOrder(technicianUserId, id ?? '') : queryKeys.serviceOrder(id ?? ''),
     queryFn: () => technicianUserId ? api.getTechnicianServiceOrder(id!) : api.getServiceOrder(id!),
     enabled: Boolean(id),

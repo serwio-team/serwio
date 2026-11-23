@@ -13,20 +13,16 @@ import jakarta.persistence.LockModeType;
 
 public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, UUID> {
     String TECHNICIAN_ACCESS = """
-            exists (
+            o.closedAt is null and exists (
                 select 1 from Technician t
-                where t.user.id = :userId and t.active = true
+                where t.user.id = :userId and t.user.status = 'ACTIVE'
+                    and t.active = true and t.branch.active = true
                     and t.branch.serviceCompany = o.serviceCompany
                     and (
-                        exists (
-                            select 1 from OrderTechnicianAssignment a
-                            where a.serviceOrder = o and a.technician = t and a.unassignedAt is null
-                        )
-                        or exists (
-                            select 1 from OrderBranchAssignment a
-                            where a.serviceOrder = o and a.branch = t.branch
-                                and a.branch.active = true and a.unassignedAt is null
-                        )
+                        exists (select 1 from OrderTechnicianAssignment a
+                            where a.serviceOrder = o and a.technician = t and a.unassignedAt is null)
+                        or exists (select 1 from OrderBranchAssignment a
+                            where a.serviceOrder = o and a.branch = t.branch and a.unassignedAt is null)
                     )
             )
             """;
@@ -40,14 +36,16 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, UUID
     Page<ServiceOrder> findForCompany(UUID userId, String status, Pageable pageable);
 
     @EntityGraph(attributePaths = {"serviceObject.location"})
-    @Query("select o from ServiceOrder o where (:status is null or o.currentStatus = :status) and " + TECHNICIAN_ACCESS)
+    @Query("select o from ServiceOrder o where (:status is null or o.currentStatus = :status) and "
+            + TECHNICIAN_ACCESS)
     Page<ServiceOrder> findForTechnician(UUID userId, String status, Pageable pageable);
-
-    @Query("select o from ServiceOrder o where o.id = :id and " + TECHNICIAN_ACCESS)
-    Optional<ServiceOrder> findByIdForTechnician(UUID id, UUID userId);
 
     Optional<ServiceOrder> findByIdAndServiceObjectLocationAssetOwnerUserId(UUID id, UUID userId);
     Optional<ServiceOrder> findByIdAndServiceCompanyUserId(UUID id, UUID userId);
+
+    @EntityGraph(attributePaths = {"serviceObject.location", "coordinatorTechnician"})
+    @Query("select o from ServiceOrder o where o.id = :id and " + TECHNICIAN_ACCESS)
+    Optional<ServiceOrder> findByIdForTechnician(UUID id, UUID userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<ServiceOrder> findForUpdateByIdAndServiceCompanyUserId(UUID id, UUID userId);

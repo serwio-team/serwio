@@ -224,5 +224,12 @@ export interface ServiceOrderResponse {
   createdByUserId: string;
   createdAt: string;
   closedAt: string | null;
-  coordinatorDisplayName?: string | null;
+}
+
+export interface TechnicianServiceOrderResponse extends ServiceOrderListItemResponse {
+  addressLine: string;
+  city: string;
+  timezone: string;
+  description: string;
+  coordinator: { id: string; displayName: string } | null;
 }

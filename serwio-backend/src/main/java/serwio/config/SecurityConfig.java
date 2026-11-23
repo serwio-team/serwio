@@ -38,8 +38,6 @@ public class SecurityConfig {
                                 .hasRole("SERVICE_COMPANY")
                         .requestMatchers(HttpMethod.GET, "/api/service-orders", "/api/service-orders/*")
                                 .hasAnyRole("ASSET_OWNER", "SERVICE_COMPANY", "TECHNICIAN")
-                        .requestMatchers(HttpMethod.GET, "/api/service-orders/**")
-                                .hasAnyRole("ASSET_OWNER", "SERVICE_COMPANY")
                         .requestMatchers("/api/service-orders", "/api/service-orders/**").denyAll()
                         .requestMatchers("/api", "/api/users/me", "/api/users/me/password").authenticated()
                         .requestMatchers("/api/owners/me").hasRole("ASSET_OWNER")

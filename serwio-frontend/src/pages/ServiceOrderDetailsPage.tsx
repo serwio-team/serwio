@@ -2,6 +2,7 @@ import { ArrowLeft, SearchX, ShieldAlert } from 'lucide-react';
 import { Link, useOutletContext, useParams } from 'react-router-dom';
 import { ApiError, errorMessage } from '../api';
 import { EmptyState, ErrorState } from '../components/DataState';
+import { OrderAssignmentCard } from '../components/OrderAssignment';
 import { serviceOrderDescriptionLabel, serviceOrderTypeLabel } from '../components/ServiceOrderForm';
 import { ServiceOrderStatusBadge } from '../components/StatusBadge';
 import { useServiceOrder } from '../queries';
@@ -66,6 +67,9 @@ export function ServiceOrderDetailsPage() {
       </header>
 
       {data ? <OrderDetails order={data} role={user.role} /> : <OrderDetailsSkeleton />}
+      {data && user.role === 'SERVICE_COMPANY' && (
+        <OrderAssignmentCard orderId={data.id} orderStatus={data.currentStatus} />
+      )}
     </>
   );
 }

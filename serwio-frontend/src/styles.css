@@ -209,6 +209,39 @@ tr:hover .row-actions, .row-actions:focus-within { opacity: 1; }
 .nowrap { white-space: nowrap; }
 .col-primary { min-width: 200px; }
 .cell-meta { display: block; font-size: 12.5px; font-weight: 400; color: var(--text-2); }
+.assignment-card { margin-top: 16px; }
+.assignment-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.assignment-header .details-heading { margin-bottom: 0; }
+.assignment-list { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.assignment-note { margin-top: 12px; }
+.chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  display: inline-flex; flex-direction: column; padding: 4px 10px; border-radius: 6px;
+  background: var(--surface-2); border: 1px solid var(--border); font-size: 13px; font-weight: 500;
+}
+.chip-sub { font-size: 11.5px; font-weight: 400; color: var(--text-2); }
+
+.assign-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.assign-field-invalid .assign-tree { border-color: var(--danger); }
+.assign-tree, .assign-staff { list-style: none; margin: 0; padding: 0; }
+.assign-tree { border: 1px solid var(--border-strong); border-radius: var(--radius); max-height: 320px; overflow-y: auto; }
+.assign-branch + .assign-branch { border-top: 1px solid var(--border); }
+.assign-selected > .assign-row { background: var(--accent-soft); }
+.assign-row { display: flex; align-items: center; gap: 6px; padding: 8px 10px 8px 6px; }
+.assign-check { display: flex; align-items: flex-start; gap: 10px; flex: 1; min-width: 0; cursor: pointer; }
+.assign-check input { width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--accent); flex: none; }
+.assign-check input:disabled + .assign-text { opacity: 0.6; }
+.assign-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.assign-name { font-size: 13.5px; font-weight: 500; overflow-wrap: anywhere; }
+.assign-hint { font-size: 12px; color: var(--text-2); overflow-wrap: anywhere; }
+.assign-warning { color: var(--warning); }
+.assign-staff { padding: 2px 10px 10px 44px; display: grid; gap: 8px; }
+.assign-empty { font-size: 12.5px; }
+.assign-summary {
+  display: flex; flex-direction: column; gap: 4px; padding: 12px; font-size: 13px;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2);
+}
+
 .row-actions-group { display: inline-flex; align-items: center; gap: 8px; }
 .cell-title { display: inline-flex; align-items: center; gap: 10px; font-weight: 500; }
 .cell-text { display: flex; flex-direction: column; min-width: 0; }

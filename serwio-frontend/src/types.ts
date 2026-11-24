@@ -288,6 +288,11 @@ export interface ServiceVisitsResponse {
   visits: ServiceVisitResponse[];
 }
 
+export interface VisitTimeRange {
+  startsAt: string;
+  endsAt: string;
+}
+
 export interface VisitStaffingRequest {
   technicianIds: string[];
   coordinatorTechnicianId: string;

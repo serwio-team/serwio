@@ -3,6 +3,7 @@ import type {
   ServiceVisitResponse,
   ServiceVisitsResponse,
   VisitStaffingRequest,
+  VisitTimeRange,
   VisitTechnicianResponse,
   OrderAssignmentRequest,
   OrderAssignmentResponse,
@@ -47,6 +48,7 @@ export class ApiError extends Error {
     readonly status: number,
     message: string,
     readonly fieldErrors: Record<string, string[]> = {},
+    readonly code?: string,
   ) {
     super(message);
   }
@@ -82,7 +84,7 @@ function defaultMessage(status: number): string {
 
 async function toApiError(response: Response): Promise<ApiError> {
   const body = (await response.json().catch(() => null)) as
-    | { detail?: string; errors?: Record<string, string[]> }
+    | { detail?: string; errors?: Record<string, string[]>; code?: string }
     | null;
   if (response.status === 401) {
     csrfCache = null;
@@ -90,7 +92,7 @@ async function toApiError(response: Response): Promise<ApiError> {
   }
   const message =
     (response.status === 400 || response.status === 409) && body?.detail ? body.detail : defaultMessage(response.status);
-  return new ApiError(response.status, message, body?.errors ?? {});
+  return new ApiError(response.status, message, body?.errors ?? {}, body?.code);
 }
 
 async function readBody<T>(response: Response): Promise<T> {
@@ -246,6 +248,17 @@ export const api = {
     mutate<ServiceVisitResponse>(
       'POST',
       `/api/service-orders/${encodeURIComponent(id)}/visits/${encodeURIComponent(visitId)}/cancel`,
+    ),
+  respondToProposal: (id: string, visitId: string, proposalId: string, action: 'accept' | 'reject') =>
+    mutate<ServiceVisitResponse>(
+      'POST',
+      `/api/service-orders/${encodeURIComponent(id)}/visits/${encodeURIComponent(visitId)}/proposals/${encodeURIComponent(proposalId)}/${action}`,
+    ),
+  counterProposal: (id: string, visitId: string, proposalId: string, data: VisitTimeRange) =>
+    mutate<ServiceVisitResponse>(
+      'POST',
+      `/api/service-orders/${encodeURIComponent(id)}/visits/${encodeURIComponent(visitId)}/proposals/${encodeURIComponent(proposalId)}/counter`,
+      data,
     ),
   listTechnicianServiceOrders: (page: number) =>
     get<ServiceOrderListItemResponse[]>(`/api/service-orders?${pageQuery(page, PAGE_SIZE)}`, fetch),

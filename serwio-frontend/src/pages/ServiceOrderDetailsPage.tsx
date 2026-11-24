@@ -68,10 +68,13 @@ export function ServiceOrderDetailsPage() {
       </header>
 
       {data ? <OrderDetails order={data} role={user.role} /> : <OrderDetailsSkeleton />}
+      {data && user.role === 'ASSET_OWNER' && (
+        <OrderVisitsCard orderId={data.id} orderStatus={data.currentStatus} role={user.role} />
+      )}
       {data && user.role === 'SERVICE_COMPANY' && (
         <>
           <OrderAssignmentCard orderId={data.id} orderStatus={data.currentStatus} />
-          <OrderVisitsCard orderId={data.id} orderStatus={data.currentStatus} />
+          <OrderVisitsCard orderId={data.id} orderStatus={data.currentStatus} role={user.role} />
         </>
       )}
     </>

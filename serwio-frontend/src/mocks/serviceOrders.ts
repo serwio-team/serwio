@@ -1,4 +1,10 @@
-import { serviceOrderFixtures, serviceOrderHistoryFixtures, serviceOrderProblemFixtures } from '../fixtures/serviceOrders';
+import {
+  serviceOrderFixtures,
+  serviceOrderHistoryFixtures,
+  serviceOrderProblemFixtures,
+  serviceVisitFixtures,
+  visitAvailabilityFixture,
+} from '../fixtures/serviceOrders';
 import type {
   AssetOwnerResponse,
   LocationResponse,
@@ -28,7 +34,7 @@ function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': type } });
 }
 
-function problem({ status, ...rest }: { status: number; detail: string; errors?: Record<string, string[]> }): Response {
+function problem({ status, ...rest }: { status: number; detail: string; errors?: Record<string, string[]>; code?: string }): Response {
   return json(status, { status, ...rest });
 }
 
@@ -255,9 +261,9 @@ async function replaceAssignment(id: string, body: Record<string, unknown>): Pro
 
 function readVisits(): Record<string, ServiceVisitResponse[]> {
   try {
-    return JSON.parse(sessionStorage.getItem(VISITS_KEY) ?? '{}') as Record<string, ServiceVisitResponse[]>;
+    return { ...serviceVisitFixtures, ...(JSON.parse(sessionStorage.getItem(VISITS_KEY) ?? '{}') as Record<string, ServiceVisitResponse[]>) };
   } catch {
-    return {};
+    return { ...serviceVisitFixtures };
   }
 }
 
@@ -357,12 +363,47 @@ function cancelVisit(order: ServiceOrderResponse, visitId: string): Response {
   return json(200, cancelled);
 }
 
+function replyToProposal(
+  order: ServiceOrderResponse,
+  visitId: string,
+  proposalId: string,
+  action: string,
+  body: Record<string, unknown>,
+): Response {
+  const visits = readVisits()[order.id] ?? [];
+  const visit = visits.find((v) => v.id === visitId);
+  if (!visit) return problem({ status: 404, detail: 'Nie znaleziono wizyty.' });
+  const proposal = visit.currentProposal;
+  if (visit.status !== 'DRAFT' || !proposal || proposal.id !== proposalId) return problem(serviceOrderProblemFixtures.staleProposal);
+  if (proposal.proposedBy === 'OWNER') {
+    return problem({ status: 403, detail: 'Na propozycję odpowiada druga strona uzgodnienia.' });
+  }
+  let updated: ServiceVisitResponse;
+  if (action === 'accept') {
+    if (new Date(proposal.startsAt) <= new Date()) return problem(serviceOrderProblemFixtures.pastProposal);
+    updated = { ...visit, status: 'CONFIRMED', currentProposal: null, startsAt: proposal.startsAt, endsAt: proposal.endsAt };
+    save({ ...order, currentStatus: 'VISIT_CONFIRMED' });
+  } else if (action === 'reject') {
+    updated = { ...visit, currentProposal: null };
+  } else {
+    const startsAt = typeof body.startsAt === 'string' ? body.startsAt : '';
+    const endsAt = typeof body.endsAt === 'string' ? body.endsAt : '';
+    if (!startsAt || Number.isNaN(Date.parse(startsAt))) return invalidField('startsAt', 'nie może mieć wartości null');
+    if (!endsAt || Number.isNaN(Date.parse(endsAt))) return invalidField('endsAt', 'nie może mieć wartości null');
+    if (Date.parse(startsAt) <= Date.now()) return invalidField('startsAt', 'Początek wizyty musi być w przyszłości.');
+    if (Date.parse(endsAt) <= Date.parse(startsAt)) return invalidField('endsAt', 'Koniec wizyty musi być późniejszy niż początek.');
+    updated = { ...visit, currentProposal: { id: crypto.randomUUID(), proposedBy: 'OWNER', startsAt, endsAt } };
+  }
+  saveVisits(order.id, visits.map((v) => (v.id === visitId ? updated : v)));
+  return json(200, updated);
+}
+
 async function visitsRoute(orderId: string, rest: string, method: string, init: RequestInit): Promise<Response> {
   const order = allOrders().find((o) => o.id === orderId);
   if (!order) return problem(serviceOrderProblemFixtures.orderNotFound);
   const body = typeof init.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : {};
   if (rest === '' && method === 'GET') {
-    return json(200, { timezone: order.timezone, availability: [], visits: readVisits()[order.id] ?? [] });
+    return json(200, { timezone: order.timezone, availability: visitAvailabilityFixture, visits: readVisits()[order.id] ?? [] });
   }
   if (rest === '' && method === 'POST') return staffVisit(order, body);
   if (rest === '/candidates' && method === 'GET') {
@@ -372,6 +413,10 @@ async function visitsRoute(orderId: string, rest: string, method: string, init: 
   }
   const staffing = /^\/([^/]+)\/staffing$/.exec(rest);
   if (staffing && method === 'PUT') return staffVisit(order, body, decodeURIComponent(staffing[1]));
+  const reply = /^\/([^/]+)\/proposals\/([^/]+)\/(accept|reject|counter)$/.exec(rest);
+  if (reply && method === 'POST') {
+    return replyToProposal(order, decodeURIComponent(reply[1]), decodeURIComponent(reply[2]), reply[3], body);
+  }
   const cancel = /^\/([^/]+)\/cancel$/.exec(rest);
   if (cancel && method === 'POST') return cancelVisit(order, decodeURIComponent(cancel[1]));
   return problem({ status: 404, detail: 'Brak takiego zasobu w mocku zleceń.' });

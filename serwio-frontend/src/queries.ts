@@ -2,6 +2,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { ApiError, PAGE_SIZE, api } from './api';
 import type {
   VisitStaffingRequest,
+  VisitTimeRange,
   OrderAssignmentRequest,
   AvailabilityRequest,
   LocationRequest,
@@ -253,6 +254,17 @@ export function useSaveVisitStaffing(orderId: string) {
 
 export function useCancelVisit(orderId: string) {
   return useVisitMutation((visitId: string) => api.cancelVisit(orderId, visitId));
+}
+
+export function useRespondToProposal(orderId: string) {
+  return useVisitMutation(({ visitId, proposalId, action, range }: {
+    visitId: string;
+    proposalId: string;
+    action: 'accept' | 'reject' | 'counter';
+    range?: VisitTimeRange;
+  }) => action === 'counter'
+    ? api.counterProposal(orderId, visitId, proposalId, range!)
+    : api.respondToProposal(orderId, visitId, proposalId, action));
 }
 
 export function useAllTechnicians() {

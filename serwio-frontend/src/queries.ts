@@ -12,6 +12,7 @@ import type {
   TechnicianPasswordRequest,
   TechnicianServiceOrderResponse,
   TechnicianUpdateRequest,
+  VisitNegotiation,
 } from './types';
 
 export const queryKeys = {
@@ -32,6 +33,7 @@ export const queryKeys = {
   serviceOrder: (id: string) => ['service-orders', 'detail', id] as const,
   technicianOrderList: (userId: string) => ['technician-orders', userId, 'list'] as const,
   technicianOrder: (userId: string, id: string) => ['technician-orders', userId, 'detail', id] as const,
+  serviceVisits: (userId: string, orderId: string) => ['service-visits', userId, orderId] as const,
   companySummary: ['companies', 'me', 'summary'] as const,
   branches: ['branches'] as const,
   branchList: ['branches', 'list'] as const,
@@ -194,6 +196,33 @@ export function useServiceOrder(id: string | undefined, technicianUserId?: strin
     queryKey: technicianUserId ? queryKeys.technicianOrder(technicianUserId, id ?? '') : queryKeys.serviceOrder(id ?? ''),
     queryFn: () => technicianUserId ? api.getTechnicianServiceOrder(id!) : api.getServiceOrder(id!),
     enabled: Boolean(id),
+  });
+}
+
+export function useServiceVisits(userId: string, orderId: string) {
+  return useQuery({
+    queryKey: queryKeys.serviceVisits(userId, orderId),
+    queryFn: () => api.listServiceVisits(orderId),
+  });
+}
+
+export function useNegotiateVisit(userId: string, orderId: string) {
+  const queryClient = useQueryClient();
+  const visitsKey = queryKeys.serviceVisits(userId, orderId);
+  return useMutation({
+    mutationFn: (action: VisitNegotiation) => api.negotiateVisit(orderId, action),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: visitsKey }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.technicianOrder(userId, orderId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.technicianOrderList(userId) }),
+      ]);
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && (error.status === 403 || error.status === 404 || error.status === 409)) {
+        return queryClient.invalidateQueries({ queryKey: visitsKey });
+      }
+    },
   });
 }
 

@@ -4,6 +4,7 @@ import { ApiError, errorMessage } from '../api';
 import { EmptyState, ErrorState } from '../components/DataState';
 import { serviceOrderDescriptionLabel, serviceOrderTypeLabel } from '../components/ServiceOrderForm';
 import { ServiceOrderStatusBadge } from '../components/StatusBadge';
+import { VisitScheduling } from '../components/VisitScheduling';
 import { useServiceOrder } from '../queries';
 import type { ServiceOrderResponse, TechnicianServiceOrderResponse, UserAccountResponse } from '../types';
 
@@ -59,6 +60,7 @@ export function ServiceOrderDetailsPage() {
       </header>
 
       {data ? <OrderDetails order={data} technician={technician} /> : <OrderDetailsSkeleton />}
+      {data && technician && <VisitScheduling key={data.id} orderId={data.id} userId={user.id} />}
     </>
   );
 }

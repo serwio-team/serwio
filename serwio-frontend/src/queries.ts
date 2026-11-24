@@ -12,7 +12,7 @@ import type {
   TechnicianPasswordRequest,
   TechnicianServiceOrderResponse,
   TechnicianUpdateRequest,
-  VisitNegotiation,
+  VisitAction,
 } from './types';
 
 export const queryKeys = {
@@ -206,21 +206,20 @@ export function useServiceVisits(userId: string, orderId: string) {
   });
 }
 
-export function useNegotiateVisit(userId: string, orderId: string) {
+export function useUpdateServiceVisit(userId: string, orderId: string) {
   const queryClient = useQueryClient();
-  const visitsKey = queryKeys.serviceVisits(userId, orderId);
+  const refresh = () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: queryKeys.serviceVisits(userId, orderId) }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.technicianOrder(userId, orderId) }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.technicianOrderList(userId) }),
+  ]);
+
   return useMutation({
-    mutationFn: (action: VisitNegotiation) => api.negotiateVisit(orderId, action),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: visitsKey }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.technicianOrder(userId, orderId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.technicianOrderList(userId) }),
-      ]);
-    },
+    mutationFn: (action: VisitAction) => api.updateServiceVisit(orderId, action),
+    onSuccess: refresh,
     onError: (error) => {
       if (error instanceof ApiError && (error.status === 403 || error.status === 404 || error.status === 409)) {
-        return queryClient.invalidateQueries({ queryKey: visitsKey });
+        return refresh();
       }
     },
   });

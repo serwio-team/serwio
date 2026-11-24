@@ -250,6 +250,8 @@ export interface VisitProposal extends VisitTimeRange {
   proposedBy: 'OWNER' | 'COORDINATOR';
 }
 
+export type VisitOutcome = 'COMPLETED' | 'REVISIT_REQUIRED';
+
 export interface ServiceVisit {
   id: string;
   status: 'DRAFT' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
@@ -257,6 +259,7 @@ export interface ServiceVisit {
   currentProposal: VisitProposal | null;
   startsAt: string | null;
   endsAt: string | null;
+  outcome: VisitOutcome | null;
 }
 
 export interface ServiceVisitsResponse {
@@ -265,7 +268,9 @@ export interface ServiceVisitsResponse {
   visits: ServiceVisit[];
 }
 
-export type VisitNegotiation =
+export type VisitAction =
   | { action: 'propose'; visitId: string; time: VisitTimeRange }
   | { action: 'counter'; visitId: string; proposalId: string; time: VisitTimeRange }
-  | { action: 'accept' | 'reject'; visitId: string; proposalId: string };
+  | { action: 'accept' | 'reject'; visitId: string; proposalId: string }
+  | { action: 'start'; visitId: string }
+  | { action: 'complete'; visitId: string; outcome: VisitOutcome };

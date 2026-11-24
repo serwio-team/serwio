@@ -27,7 +27,7 @@ import type {
   TechnicianServiceOrderResponse,
   TechnicianUpdateRequest,
   UserAccountResponse,
-  VisitNegotiation,
+  VisitAction,
 } from './types';
 
 export const PAGE_SIZE = 20;
@@ -232,8 +232,13 @@ export const api = {
   getTechnicianServiceOrder: (id: string) =>
     get<TechnicianServiceOrderResponse>(`/api/service-orders/${encodeURIComponent(id)}`, fetch),
   listServiceVisits: (orderId: string) => get<ServiceVisitsResponse>(visitPath(orderId)),
-  negotiateVisit(orderId: string, action: VisitNegotiation) {
-    const proposals = `${visitPath(orderId)}/${encodeURIComponent(action.visitId)}/proposals`;
+  updateServiceVisit(orderId: string, action: VisitAction) {
+    const visit = `${visitPath(orderId)}/${encodeURIComponent(action.visitId)}`;
+    if (action.action === 'start') return mutate<ServiceVisit>('POST', `${visit}/start`);
+    if (action.action === 'complete') {
+      return mutate<ServiceVisit>('POST', `${visit}/complete`, { outcome: action.outcome });
+    }
+    const proposals = `${visit}/proposals`;
     const path = action.action === 'propose'
       ? proposals
       : `${proposals}/${encodeURIComponent(action.proposalId)}/${action.action}`;

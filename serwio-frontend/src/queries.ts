@@ -29,6 +29,7 @@ export const queryKeys = {
   serviceObject: (id: string) => ['service-objects', 'detail', id] as const,
   serviceOrders: ['service-orders'] as const,
   serviceOrderList: (statuses: string[]) => ['service-orders', 'list', statuses.join(',')] as const,
+  companyOrderList: (status?: string) => ['service-orders', 'company', status ?? 'all'] as const,
   serviceOrder: (id: string) => ['service-orders', 'detail', id] as const,
   technicianOrderList: (userId: string) => ['technician-orders', userId, 'list'] as const,
   technicianOrder: (userId: string, id: string) => ['technician-orders', userId, 'detail', id] as const,
@@ -177,6 +178,15 @@ export function useServiceOrderList(statuses: string[]) {
     queryFn: ({ pageParam }) => api.listServiceOrders(statuses, pageParam),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextPage,
+  });
+}
+
+export function useCompanyServiceOrderList(status: string | undefined) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.companyOrderList(status),
+    queryFn: ({ pageParam }) => api.listCompanyServiceOrders(pageParam, status),
+    initialPageParam: 0,
+    getNextPageParam: nextPage,
   });
 }
 

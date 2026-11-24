@@ -7,6 +7,7 @@ import { AppLayout } from './components/AppLayout';
 import { BranchDetailsPage } from './pages/BranchDetailsPage';
 import { BranchesPage } from './pages/BranchesPage';
 import { CompanyDashboardPage } from './pages/CompanyDashboardPage';
+import { CompanyOrdersPage } from './pages/CompanyOrdersPage';
 import { LocationsPage } from './pages/LocationsPage';
 import { OrdersPage } from './pages/OrdersPage';
 import { ServiceObjectDetailsPage } from './pages/ServiceObjectDetailsPage';
@@ -50,6 +51,8 @@ export function App() {
           <Route path="/company/branches" element={<BranchesPage />} />
           <Route path="/company/branches/:id" element={<BranchDetailsPage />} />
           <Route path="/company/technicians" element={<TechniciansPage />} />
+          <Route path="/company/orders" element={<CompanyOrdersPage />} />
+          <Route path="/company/orders/:id" element={<ServiceOrderDetailsPage />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

@@ -255,3 +255,40 @@ export interface OrderAssignmentResponse {
   technicians: { id: string; displayName: string; branchId: string }[];
   coordinatorTechnicianId: string | null;
 }
+
+export interface VisitTechnicianResponse {
+  id: string;
+  displayName: string;
+  branchId: string;
+}
+
+export interface VisitProposalResponse {
+  id: string;
+  proposedBy: string;
+  startsAt: string;
+  endsAt: string;
+}
+
+export interface ServiceVisitResponse {
+  id: string;
+  status: string;
+  coordinatorTechnicianId: string;
+  technicians: VisitTechnicianResponse[];
+  currentProposal: VisitProposalResponse | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  outcome: string | null;
+}
+
+export interface ServiceVisitsResponse {
+  timezone: string;
+  availability: AvailabilityDay[];
+  visits: ServiceVisitResponse[];
+}
+
+export interface VisitStaffingRequest {
+  technicianIds: string[];
+  coordinatorTechnicianId: string;
+}

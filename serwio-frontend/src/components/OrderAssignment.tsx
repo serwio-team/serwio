@@ -11,12 +11,10 @@ import { useToast } from './Toast';
 
 const ASSIGNABLE_STATUSES = ['NEW', 'ASSIGNED', 'AWAITING_SCHEDULING', 'REVISIT_REQUIRED'];
 
-const assignable = (t: TechnicianResponse) => t.active && t.accountStatus === 'ACTIVE';
+const assignable = (t: TechnicianResponse) => t.active && t.accountStatus !== 'INACTIVE';
 
 function technicianIssue(t: TechnicianResponse): string | null {
-  if (!t.active || t.accountStatus === 'INACTIVE') return 'Konto nieaktywne';
-  if (t.accountStatus === 'PENDING') return 'Konto oczekuje na aktywację';
-  return null;
+  return assignable(t) ? null : 'Konto nieaktywne';
 }
 
 function people(n: number): string {
@@ -286,7 +284,7 @@ function AssignmentForm({ assignment, branches, technicians, onClose }: Assignme
                                 <span className="assign-text">
                                   <span className="assign-name">{t.displayName}</span>
                                   <span className={`assign-hint${issue ? ' assign-warning' : ''}`}>
-                                    {issue ?? (whole ? 'Ma już dostęp przez cały oddział' : t.email)}
+                                    {issue ?? (whole ? 'Ma już dostęp przez cały oddział' : t.accountStatus === 'PENDING' ? `${t.email} · nie zmienił hasła startowego` : t.email)}
                                   </span>
                                 </span>
                               </label>

@@ -7,12 +7,14 @@ import type {
   ServiceObjectResponse,
   ServiceOrderListItemResponse,
   ServiceOrderResponse,
+  ServiceVisitResponse,
   TechnicianResponse,
   UserAccountResponse,
 } from '../types';
 
 const STORAGE_KEY = 'serwio:mock-service-orders';
 const ASSIGNMENT_KEY = 'serwio:mock-order-assignments';
+const VISITS_KEY = 'serwio:mock-order-visits';
 const ASSIGNABLE_STATUSES = ['NEW', 'ASSIGNED', 'AWAITING_SCHEDULING', 'REVISIT_REQUIRED'];
 const ORDER_TYPES = ['REPAIR', 'INSPECTION'];
 const QUERY_STATUSES = [
@@ -219,7 +221,7 @@ async function replaceAssignment(id: string, body: Record<string, unknown>): Pro
   if (selectedBranches.length !== branchIds.length) {
     return invalidField('branchIds', 'Oddział jest nieaktywny lub nie należy do firmy.');
   }
-  const usable = technicians.data!.filter((t) => t.active && t.accountStatus === 'ACTIVE');
+  const usable = technicians.data!.filter((t) => t.active && t.accountStatus !== 'INACTIVE');
   const selectedTechnicians = usable.filter((t) => technicianIds.includes(t.id));
   if (selectedTechnicians.length !== technicianIds.length) {
     return invalidField('technicianIds', 'Serwisant jest nieaktywny lub nie należy do firmy.');
@@ -251,6 +253,130 @@ async function replaceAssignment(id: string, body: Record<string, unknown>): Pro
   return json(200, saved);
 }
 
+function readVisits(): Record<string, ServiceVisitResponse[]> {
+  try {
+    return JSON.parse(sessionStorage.getItem(VISITS_KEY) ?? '{}') as Record<string, ServiceVisitResponse[]>;
+  } catch {
+    return {};
+  }
+}
+
+function saveVisits(orderId: string, visits: ServiceVisitResponse[]) {
+  try {
+    sessionStorage.setItem(VISITS_KEY, JSON.stringify({ ...readVisits(), [orderId]: visits }));
+  } catch {
+    return;
+  }
+}
+
+function visitConflict(code: string, detail: string): Response {
+  return json(409, { status: 409, detail, code });
+}
+
+async function visitCandidates(order: ServiceOrderResponse): Promise<{ data?: TechnicianResponse[]; failure?: Response }> {
+  const assignment = currentAssignment(order);
+  const technicians = await load<TechnicianResponse[]>('/api/technicians?page=0&size=100');
+  if (technicians.failure) return technicians;
+  const branchIds = assignment.branches.map((b) => b.id);
+  const technicianIds = assignment.technicians.map((t) => t.id);
+  return {
+    data: technicians.data!.filter((t) => t.active && t.accountStatus !== 'INACTIVE'
+      && (branchIds.includes(t.branchId) || technicianIds.includes(t.id))),
+  };
+}
+
+async function staffVisit(order: ServiceOrderResponse, body: Record<string, unknown>, visitId?: string): Promise<Response> {
+  const technicianIds = idList(body.technicianIds);
+  const coordinatorId = typeof body.coordinatorTechnicianId === 'string' ? body.coordinatorTechnicianId : '';
+  if (!technicianIds || technicianIds.length === 0) return invalidField('technicianIds', 'nie może być puste');
+  if (new Set(technicianIds).size !== technicianIds.length) {
+    return invalidField('technicianIds', 'Identyfikatory nie mogą się powtarzać.');
+  }
+  if (!coordinatorId) return invalidField('coordinatorTechnicianId', 'nie może mieć wartości null');
+  const visits = readVisits()[order.id] ?? [];
+  const existing = visitId ? visits.find((v) => v.id === visitId) : undefined;
+  if (visitId && !existing) return problem({ status: 404, detail: 'Nie znaleziono wizyty.' });
+  if (existing && existing.status !== 'DRAFT') {
+    return visitConflict('INVALID_VISIT_STATE', 'Obsadę można zmienić podczas uzgadniania terminu.');
+  }
+  if (!existing && (!['ASSIGNED', 'REVISIT_REQUIRED'].includes(order.currentStatus)
+      || visits.some((v) => ['DRAFT', 'CONFIRMED', 'IN_PROGRESS'].includes(v.status)))) {
+    return visitConflict('INVALID_VISIT_STATE', 'Nie można utworzyć wizyty dla tego zlecenia.');
+  }
+  const candidates = await visitCandidates(order);
+  if (candidates.failure) return candidates.failure;
+  const staff = candidates.data!.filter((t) => technicianIds.includes(t.id));
+  if (staff.length !== technicianIds.length) {
+    return invalidField('technicianIds', 'Serwisant nie ma uprawnień do tego zlecenia.');
+  }
+  if (!technicianIds.includes(coordinatorId)) {
+    return invalidField('coordinatorTechnicianId', 'Koordynator musi być jednym z wykonawców.');
+  }
+  const technicians = staff
+    .map((t) => ({ id: t.id, displayName: t.displayName, branchId: t.branchId }))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  if (existing) {
+    const same = existing.coordinatorTechnicianId === coordinatorId
+      && existing.technicians.length === technicians.length
+      && existing.technicians.every((t) => technicianIds.includes(t.id));
+    const updated = same ? existing : { ...existing, technicians, coordinatorTechnicianId: coordinatorId, currentProposal: null };
+    saveVisits(order.id, visits.map((v) => (v.id === existing.id ? updated : v)));
+    return json(200, updated);
+  }
+  const created: ServiceVisitResponse = {
+    id: crypto.randomUUID(),
+    status: 'DRAFT',
+    coordinatorTechnicianId: coordinatorId,
+    technicians,
+    currentProposal: null,
+    startsAt: null,
+    endsAt: null,
+    startedAt: null,
+    completedAt: null,
+    outcome: null,
+  };
+  saveVisits(order.id, [created, ...visits]);
+  save({ ...order, currentStatus: 'AWAITING_SCHEDULING' });
+  return json(201, created);
+}
+
+function cancelVisit(order: ServiceOrderResponse, visitId: string): Response {
+  const visits = readVisits()[order.id] ?? [];
+  const visit = visits.find((v) => v.id === visitId);
+  if (!visit) return problem({ status: 404, detail: 'Nie znaleziono wizyty.' });
+  const draft = visit.status === 'DRAFT';
+  const confirmed = visit.status === 'CONFIRMED';
+  if (!draft && !confirmed) return visitConflict('INVALID_VISIT_STATE', 'Tej wizyty nie można anulować.');
+  if (confirmed && (!visit.startsAt || new Date(visit.startsAt) <= new Date())) {
+    return visitConflict('INVALID_VISIT_STATE', 'Potwierdzoną wizytę można anulować przed jej rozpoczęciem.');
+  }
+  const cancelled = { ...visit, status: 'CANCELLED', currentProposal: null };
+  saveVisits(order.id, visits.map((v) => (v.id === visitId ? cancelled : v)));
+  const revisit = visits.some((v) => v.status === 'COMPLETED' && v.outcome === 'REVISIT_REQUIRED');
+  save({ ...order, currentStatus: revisit ? 'REVISIT_REQUIRED' : 'ASSIGNED' });
+  return json(200, cancelled);
+}
+
+async function visitsRoute(orderId: string, rest: string, method: string, init: RequestInit): Promise<Response> {
+  const order = allOrders().find((o) => o.id === orderId);
+  if (!order) return problem(serviceOrderProblemFixtures.orderNotFound);
+  const body = typeof init.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : {};
+  if (rest === '' && method === 'GET') {
+    return json(200, { timezone: order.timezone, availability: [], visits: readVisits()[order.id] ?? [] });
+  }
+  if (rest === '' && method === 'POST') return staffVisit(order, body);
+  if (rest === '/candidates' && method === 'GET') {
+    const candidates = await visitCandidates(order);
+    if (candidates.failure) return candidates.failure;
+    return json(200, candidates.data!.map((t) => ({ id: t.id, displayName: t.displayName, branchId: t.branchId })));
+  }
+  const staffing = /^\/([^/]+)\/staffing$/.exec(rest);
+  if (staffing && method === 'PUT') return staffVisit(order, body, decodeURIComponent(staffing[1]));
+  const cancel = /^\/([^/]+)\/cancel$/.exec(rest);
+  if (cancel && method === 'POST') return cancelVisit(order, decodeURIComponent(cancel[1]));
+  return problem({ status: 404, detail: 'Brak takiego zasobu w mocku zleceń.' });
+}
+
 export async function mockServiceOrderFetch(url: string, init: RequestInit = {}): Promise<Response> {
   await new Promise((resolve) => setTimeout(resolve, 400));
   const [path, query = ''] = url.split('?');
@@ -261,6 +387,8 @@ export async function mockServiceOrderFetch(url: string, init: RequestInit = {})
     return create(body);
   }
   if (path === '/api/service-orders' && method === 'GET') return list(new URLSearchParams(query));
+  const visitsMatch = /^\/api\/service-orders\/([^/]+)\/visits(\/.*)?$/.exec(path);
+  if (visitsMatch) return visitsRoute(decodeURIComponent(visitsMatch[1]), visitsMatch[2] ?? '', method, init);
   const assignmentMatch = /^\/api\/service-orders\/([^/]+)\/assignment$/.exec(path);
   if (assignmentMatch) {
     const id = decodeURIComponent(assignmentMatch[1]);

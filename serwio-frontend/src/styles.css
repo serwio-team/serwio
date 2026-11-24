@@ -221,6 +221,20 @@ tr:hover .row-actions, .row-actions:focus-within { opacity: 1; }
 }
 .chip-sub { font-size: 11.5px; font-weight: 400; color: var(--text-2); }
 
+.assign-flat > li { padding: 8px 12px; }
+.assign-flat > li + li { border-top: 1px solid var(--border); }
+.assign-flat > li.assign-selected { background: var(--accent-soft); }
+
+.visit { display: grid; gap: 12px; }
+.visit-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.visit-title { font-size: 13.5px; font-weight: 600; }
+.visit-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.visit-term { font-weight: 500; }
+.visit-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.visit-history { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
+.visit-history summary { cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-2); }
+.visit-history .visit { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); }
+
 .assign-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .assign-field-invalid .assign-tree { border-color: var(--danger); }
 .assign-tree, .assign-staff { list-style: none; margin: 0; padding: 0; }

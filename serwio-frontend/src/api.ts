@@ -1,5 +1,9 @@
 import { mockServiceOrderFetch } from './mocks/serviceOrders';
 import type {
+  ServiceVisitResponse,
+  ServiceVisitsResponse,
+  VisitStaffingRequest,
+  VisitTechnicianResponse,
   OrderAssignmentRequest,
   OrderAssignmentResponse,
   AvailabilityRequest,
@@ -226,6 +230,23 @@ export const api = {
     get<OrderAssignmentResponse>(`/api/service-orders/${encodeURIComponent(id)}/assignment`),
   saveOrderAssignment: (id: string, data: OrderAssignmentRequest) =>
     mutate<OrderAssignmentResponse>('PUT', `/api/service-orders/${encodeURIComponent(id)}/assignment`, data),
+  getOrderVisits: (id: string) =>
+    get<ServiceVisitsResponse>(`/api/service-orders/${encodeURIComponent(id)}/visits`),
+  getVisitCandidates: (id: string) =>
+    get<VisitTechnicianResponse[]>(`/api/service-orders/${encodeURIComponent(id)}/visits/candidates`),
+  createVisit: (id: string, data: VisitStaffingRequest) =>
+    mutate<ServiceVisitResponse>('POST', `/api/service-orders/${encodeURIComponent(id)}/visits`, data),
+  updateVisitStaffing: (id: string, visitId: string, data: VisitStaffingRequest) =>
+    mutate<ServiceVisitResponse>(
+      'PUT',
+      `/api/service-orders/${encodeURIComponent(id)}/visits/${encodeURIComponent(visitId)}/staffing`,
+      data,
+    ),
+  cancelVisit: (id: string, visitId: string) =>
+    mutate<ServiceVisitResponse>(
+      'POST',
+      `/api/service-orders/${encodeURIComponent(id)}/visits/${encodeURIComponent(visitId)}/cancel`,
+    ),
   listTechnicianServiceOrders: (page: number) =>
     get<ServiceOrderListItemResponse[]>(`/api/service-orders?${pageQuery(page, PAGE_SIZE)}`, fetch),
   getTechnicianServiceOrder: (id: string) =>

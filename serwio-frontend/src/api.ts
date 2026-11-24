@@ -9,6 +9,7 @@ import type {
   LocationRequest,
   LocationResponse,
   PasswordChangeRequest,
+  ReportDraftRequest,
   ServiceBranchRequest,
   ServiceBranchResponse,
   ServiceCompanyResponse,
@@ -18,6 +19,7 @@ import type {
   ServiceOrderListItemResponse,
   ServiceOrderRequest,
   ServiceOrderResponse,
+  ServiceReport,
   ServiceVisit,
   ServiceVisitsResponse,
   TechnicianCreateRequest,
@@ -154,6 +156,10 @@ function visitPath(orderId: string) {
   return `/api/service-orders/${encodeURIComponent(orderId)}/visits`;
 }
 
+function reportPath(orderId: string) {
+  return `/api/service-orders/${encodeURIComponent(orderId)}/report`;
+}
+
 async function listServiceOrders(statuses: string[], page: number): Promise<ServiceOrderPage> {
   const status = statuses.length === 1 && SERVER_ORDER_STATUS_FILTERS.includes(statuses[0]) ? statuses[0] : undefined;
   const items: ServiceOrderListItemResponse[] = [];
@@ -232,6 +238,10 @@ export const api = {
   getTechnicianServiceOrder: (id: string) =>
     get<TechnicianServiceOrderResponse>(`/api/service-orders/${encodeURIComponent(id)}`, fetch),
   listServiceVisits: (orderId: string) => get<ServiceVisitsResponse>(visitPath(orderId)),
+  getServiceReport: (orderId: string) => get<ServiceReport>(reportPath(orderId)),
+  saveReportDraft: (orderId: string, draft: ReportDraftRequest) =>
+    mutate<ServiceReport>('PUT', reportPath(orderId), draft),
+  finalizeReport: (orderId: string) => mutate<ServiceReport>('POST', `${reportPath(orderId)}/finalize`),
   updateServiceVisit(orderId: string, action: VisitAction) {
     const visit = `${visitPath(orderId)}/${encodeURIComponent(action.visitId)}`;
     if (action.action === 'start') return mutate<ServiceVisit>('POST', `${visit}/start`);

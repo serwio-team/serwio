@@ -274,3 +274,20 @@ export type VisitAction =
   | { action: 'accept' | 'reject'; visitId: string; proposalId: string }
   | { action: 'start'; visitId: string }
   | { action: 'complete'; visitId: string; outcome: VisitOutcome };
+
+export interface ReportDraftRequest {
+  actionsDone: string | null;
+  diagnosis: string | null;
+  resolution: string | null;
+  usedMaterials: string | null;
+  recommendations: string | null;
+}
+
+export interface ServiceReport extends ReportDraftRequest {
+  id: string;
+  serviceOrderId: string;
+  authorTechnicianId: string;
+  createdAt: string;
+  updatedAt: string;
+  finalizedAt: string | null;
+}

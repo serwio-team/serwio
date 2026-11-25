@@ -36,6 +36,7 @@ export const queryKeys = {
   orderAssignment: (id: string) => ['service-orders', 'assignment', id] as const,
   orderVisits: (id: string) => ['service-orders', 'visits', id] as const,
   visitCandidates: (id: string) => ['service-orders', 'visit-candidates', id] as const,
+  serviceReport: (id: string) => ['service-orders', 'report', id] as const,
   serviceOrder: (id: string) => ['service-orders', 'detail', id] as const,
   technicianOrderList: (userId: string) => ['technician-orders', userId, 'list'] as const,
   technicianOrder: (userId: string, id: string) => ['technician-orders', userId, 'detail', id] as const,
@@ -235,7 +236,7 @@ export function useVisitCandidates(id: string) {
   return useQuery({ queryKey: queryKeys.visitCandidates(id), queryFn: () => api.getVisitCandidates(id) });
 }
 
-function useVisitMutation<T>(mutationFn: (variables: T) => Promise<unknown>) {
+function useOrderMutation<T>(mutationFn: (variables: T) => Promise<unknown>) {
   const queryClient = useQueryClient();
   const refresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.serviceOrders });
   return useMutation({
@@ -248,16 +249,16 @@ function useVisitMutation<T>(mutationFn: (variables: T) => Promise<unknown>) {
 }
 
 export function useSaveVisitStaffing(orderId: string) {
-  return useVisitMutation(({ visitId, data }: { visitId?: string; data: VisitStaffingRequest }) =>
+  return useOrderMutation(({ visitId, data }: { visitId?: string; data: VisitStaffingRequest }) =>
     visitId ? api.updateVisitStaffing(orderId, visitId, data) : api.createVisit(orderId, data));
 }
 
 export function useCancelVisit(orderId: string) {
-  return useVisitMutation((visitId: string) => api.cancelVisit(orderId, visitId));
+  return useOrderMutation((visitId: string) => api.cancelVisit(orderId, visitId));
 }
 
 export function useRespondToProposal(orderId: string) {
-  return useVisitMutation(({ visitId, proposalId, action, range }: {
+  return useOrderMutation(({ visitId, proposalId, action, range }: {
     visitId: string;
     proposalId: string;
     action: 'accept' | 'reject' | 'counter';
@@ -265,6 +266,14 @@ export function useRespondToProposal(orderId: string) {
   }) => action === 'counter'
     ? api.counterProposal(orderId, visitId, proposalId, range!)
     : api.respondToProposal(orderId, visitId, proposalId, action));
+}
+
+export function useServiceReport(id: string, enabled: boolean) {
+  return useQuery({ queryKey: queryKeys.serviceReport(id), queryFn: () => api.getServiceReport(id), enabled });
+}
+
+export function useEndServiceOrder(orderId: string) {
+  return useOrderMutation((action: 'cancel' | 'close') => api.endServiceOrder(orderId, action));
 }
 
 export function useAllTechnicians() {

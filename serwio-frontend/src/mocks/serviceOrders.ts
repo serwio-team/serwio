@@ -2,6 +2,7 @@ import {
   serviceOrderFixtures,
   serviceOrderHistoryFixtures,
   serviceOrderProblemFixtures,
+  serviceReportFixture,
   serviceVisitFixtures,
   visitAvailabilityFixture,
 } from '../fixtures/serviceOrders';
@@ -422,6 +423,34 @@ async function visitsRoute(orderId: string, rest: string, method: string, init: 
   return problem({ status: 404, detail: 'Brak takiego zasobu w mocku zleceń.' });
 }
 
+const CANCELLABLE_STATUSES = [
+  'NEW', 'ASSIGNED', 'AWAITING_SCHEDULING', 'VISIT_CONFIRMED', 'AWAITING_TECHNICIAN_REVIEW', 'AWAITING_OWNER_CONFIRMATION',
+];
+
+function endOrder(order: ServiceOrderResponse, action: string): Response {
+  if (order.closedAt) return problem({ ...serviceOrderProblemFixtures.invalidOrderState, detail: 'Zlecenie jest już zakończone.' });
+  const visits = readVisits()[order.id] ?? [];
+  const now = new Date().toISOString();
+  if (action === 'cancel') {
+    if (!CANCELLABLE_STATUSES.includes(order.currentStatus) || visits.some((v) => v.startedAt)) {
+      return problem(serviceOrderProblemFixtures.invalidOrderState);
+    }
+    saveVisits(order.id, visits.map((v) => (['DRAFT', 'CONFIRMED'].includes(v.status)
+      ? { ...v, status: 'CANCELLED', currentProposal: null }
+      : v)));
+    const cancelled = { ...order, currentStatus: 'CANCELLED', closedAt: now };
+    save(cancelled);
+    return json(200, cancelled);
+  }
+  if (order.currentStatus !== 'COMPLETED' || visits.some((v) => !['CANCELLED', 'COMPLETED'].includes(v.status))) {
+    return problem(serviceOrderProblemFixtures.orderNotCompleted);
+  }
+  if (!order.reportFinalized) return problem(serviceOrderProblemFixtures.reportNotFinalized);
+  const closed = { ...order, currentStatus: 'CLOSED', closedAt: now };
+  save(closed);
+  return json(200, closed);
+}
+
 export async function mockServiceOrderFetch(url: string, init: RequestInit = {}): Promise<Response> {
   await new Promise((resolve) => setTimeout(resolve, 400));
   const [path, query = ''] = url.split('?');
@@ -432,6 +461,16 @@ export async function mockServiceOrderFetch(url: string, init: RequestInit = {})
     return create(body);
   }
   if (path === '/api/service-orders' && method === 'GET') return list(new URLSearchParams(query));
+  const endMatch = /^\/api\/service-orders\/([^/]+)\/(cancel|close)$/.exec(path);
+  if (endMatch && method === 'POST') {
+    const order = allOrders().find((o) => o.id === decodeURIComponent(endMatch[1]));
+    return order ? endOrder(order, endMatch[2]) : problem(serviceOrderProblemFixtures.orderNotFound);
+  }
+  const reportMatch = /^\/api\/service-orders\/([^/]+)\/report$/.exec(path);
+  if (reportMatch && method === 'GET') {
+    const order = allOrders().find((o) => o.id === decodeURIComponent(reportMatch[1]));
+    return order?.reportFinalized ? json(200, serviceReportFixture(order)) : problem(serviceOrderProblemFixtures.reportNotFound);
+  }
   const visitsMatch = /^\/api\/service-orders\/([^/]+)\/visits(\/.*)?$/.exec(path);
   if (visitsMatch) return visitsRoute(decodeURIComponent(visitsMatch[1]), visitsMatch[2] ?? '', method, init);
   const assignmentMatch = /^\/api\/service-orders\/([^/]+)\/assignment$/.exec(path);

@@ -297,3 +297,17 @@ export interface VisitStaffingRequest {
   technicianIds: string[];
   coordinatorTechnicianId: string;
 }
+
+export interface ServiceReportResponse {
+  id: string;
+  serviceOrderId: string;
+  authorTechnicianId: string;
+  actionsDone: string | null;
+  diagnosis: string | null;
+  resolution: string | null;
+  usedMaterials: string | null;
+  recommendations: string | null;
+  createdAt: string;
+  updatedAt: string;
+  finalizedAt: string | null;
+}

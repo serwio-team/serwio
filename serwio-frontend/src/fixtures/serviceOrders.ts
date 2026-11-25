@@ -1,4 +1,4 @@
-import type { AvailabilityDay, ServiceOrderResponse, ServiceVisitResponse } from '../types';
+import type { AvailabilityDay, ServiceOrderResponse, ServiceReportResponse, ServiceVisitResponse } from '../types';
 
 const base = {
   serviceObjectId: '00000000-0000-0000-0000-000000000101',
@@ -39,6 +39,15 @@ export const serviceOrderFixtures = {
     description: 'Wentylator jednostki zewnętrznej hałasuje przy starcie.',
     currentStatus: 'AWAITING_SCHEDULING',
     createdAt: '2026-11-04T07:45:00Z',
+  },
+  completed: {
+    ...base,
+    id: '00000000-0000-0000-0000-000000000604',
+    orderType: 'INSPECTION',
+    description: 'Przegląd okresowy przed sezonem grzewczym.',
+    currentStatus: 'COMPLETED',
+    createdAt: '2026-11-05T08:00:00Z',
+    reportFinalized: true,
   },
 } satisfies Record<string, ServiceOrderResponse>;
 
@@ -125,6 +134,23 @@ export const serviceOrderHistoryFixtures: ServiceOrderResponse[] = Array.from({ 
   };
 });
 
+export function serviceReportFixture(order: ServiceOrderResponse): ServiceReportResponse {
+  const finalizedAt = order.closedAt ?? '2026-11-06T15:30:00Z';
+  return {
+    id: `${order.id.slice(0, 24)}000000000999`,
+    serviceOrderId: order.id,
+    authorTechnicianId: '00000000-0000-0000-0000-000000000951',
+    actionsDone: 'Oczyszczono filtry, sprawdzono szczelność instalacji i parametry pracy.',
+    diagnosis: 'Zabrudzone filtry ograniczały przepływ powietrza.',
+    resolution: 'Po czyszczeniu urządzenie pracuje poprawnie, parametry w normie.',
+    usedMaterials: order.orderType === 'REPAIR' ? 'Filtr wstępny, 2 szt.' : null,
+    recommendations: 'Kolejny przegląd za 6 miesięcy.',
+    createdAt: '2026-11-06T13:00:00Z',
+    updatedAt: finalizedAt,
+    finalizedAt,
+  };
+}
+
 export const serviceOrderProblemFixtures = {
   validation: {
     status: 400,
@@ -135,6 +161,10 @@ export const serviceOrderProblemFixtures = {
   objectNotFound: { status: 404, detail: 'Nie znaleziono aktywnego obiektu serwisowego.' },
   orderNotFound: { status: 404, detail: 'Nie znaleziono zlecenia.' },
   staleProposal: { status: 409, code: 'STALE_PROPOSAL', detail: 'Propozycja nie jest już aktualna.' },
+  invalidOrderState: { status: 409, code: 'INVALID_ORDER_STATE', detail: 'Zlecenie można anulować przed rozpoczęciem realizacji.' },
+  orderNotCompleted: { status: 409, code: 'INVALID_ORDER_STATE', detail: 'Zamknąć można tylko wykonane zlecenie.' },
+  reportNotFinalized: { status: 409, code: 'REPORT_NOT_FINALIZED', detail: 'Przed zamknięciem zlecenia sfinalizuj raport.' },
+  reportNotFound: { status: 404, detail: 'Nie znaleziono raportu.' },
   pastProposal: { status: 409, code: 'OUTSIDE_LOCATION_AVAILABILITY', detail: 'Termin jest poza dostępnym oknem lokalizacji.' },
   assignmentConflict: { status: 409, detail: 'Przydział został zmieniony. Odśwież dane i spróbuj ponownie.' },
   assignmentLocked: { status: 409, detail: 'Przydział można zmienić przed potwierdzeniem terminu wizyty.' },

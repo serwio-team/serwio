@@ -1,5 +1,6 @@
 import { mockServiceOrderFetch } from './mocks/serviceOrders';
 import type {
+  ServiceReportResponse,
   ServiceVisitResponse,
   ServiceVisitsResponse,
   VisitStaffingRequest,
@@ -260,6 +261,10 @@ export const api = {
       `/api/service-orders/${encodeURIComponent(id)}/visits/${encodeURIComponent(visitId)}/proposals/${encodeURIComponent(proposalId)}/counter`,
       data,
     ),
+  endServiceOrder: (id: string, action: 'cancel' | 'close') =>
+    mutate<ServiceOrderResponse>('POST', `/api/service-orders/${encodeURIComponent(id)}/${action}`),
+  getServiceReport: (id: string) =>
+    get<ServiceReportResponse>(`/api/service-orders/${encodeURIComponent(id)}/report`),
   listTechnicianServiceOrders: (page: number) =>
     get<ServiceOrderListItemResponse[]>(`/api/service-orders?${pageQuery(page, PAGE_SIZE)}`, fetch),
   getTechnicianServiceOrder: (id: string) =>

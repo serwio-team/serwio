@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="serwio-frontend/public/logo.svg" alt="Znak Serwio" width="80" height="80" />
+
 <h1>Serwio</h1>
 
 <p>
@@ -23,6 +25,8 @@
 </div>
 
 ## O projekcie
+
+![Serwio: zlecenia serwisowe od zgłoszenia do raportu](docs/images/social-preview.png)
 
 Serwio łączy trzy strony zlecenia serwisowego w jednej aplikacji webowej. Właściciel
 obiektu, czyli np. restauracja, hotel lub zakład, zgłasza naprawę albo przegląd urządzenia.
@@ -126,6 +130,7 @@ a scenariusze HTTP także na PostgreSQL 17. Szczegóły: [docs/testing.md](docs/
 ## Dokumentacja
 
 - [Specyfikacja MVP](docs/serwio_specyfikacja_v0.1.md): pojęcia, role, procesy i bezpieczeństwo
+- [Wygląd aplikacji](docs/design.md): znak, kolory, statusy i typografia
 - [Diagram ERD](docs/erd/serwio_erd_mvp_diagram.png) i [słownik pojęć](docs/erd/serwio_erd_mvp_slownik_pojec.md)
 - Kontrakty API: [przydziały](docs/order-assignment.md), [zlecenia serwisanta](docs/technician-orders.md), [wizyty](docs/service-visits.md), [raporty](docs/service-reports.md), [dostępność lokalizacji](docs/location-availability.md)
 

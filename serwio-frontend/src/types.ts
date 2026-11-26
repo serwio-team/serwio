@@ -262,16 +262,21 @@ export interface VisitTechnicianResponse {
   branchId: string;
 }
 
-export interface VisitProposalResponse {
-  id: string;
-  proposedBy: string;
+export interface VisitTimeRange {
   startsAt: string;
   endsAt: string;
 }
 
+export interface VisitProposalResponse extends VisitTimeRange {
+  id: string;
+  proposedBy: 'OWNER' | 'COORDINATOR';
+}
+
+export type VisitOutcome = 'COMPLETED' | 'REVISIT_REQUIRED';
+
 export interface ServiceVisitResponse {
   id: string;
-  status: string;
+  status: 'DRAFT' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   coordinatorTechnicianId: string;
   technicians: VisitTechnicianResponse[];
   currentProposal: VisitProposalResponse | null;
@@ -279,7 +284,7 @@ export interface ServiceVisitResponse {
   endsAt: string | null;
   startedAt: string | null;
   completedAt: string | null;
-  outcome: string | null;
+  outcome: VisitOutcome | null;
 }
 
 export interface ServiceVisitsResponse {
@@ -288,7 +293,31 @@ export interface ServiceVisitsResponse {
   visits: ServiceVisitResponse[];
 }
 
+export type VisitAction =
+  | { action: 'propose'; visitId: string; time: VisitTimeRange }
+  | { action: 'counter'; visitId: string; proposalId: string; time: VisitTimeRange }
+  | { action: 'accept' | 'reject'; visitId: string; proposalId: string }
+  | { action: 'start'; visitId: string }
+  | { action: 'complete'; visitId: string; outcome: VisitOutcome };
+
 export interface VisitStaffingRequest {
   technicianIds: string[];
   coordinatorTechnicianId: string;
+}
+
+export interface ReportDraftRequest {
+  actionsDone: string | null;
+  diagnosis: string | null;
+  resolution: string | null;
+  usedMaterials: string | null;
+  recommendations: string | null;
+}
+
+export interface ServiceReportResponse extends ReportDraftRequest {
+  id: string;
+  serviceOrderId: string;
+  authorTechnicianId: string;
+  createdAt: string;
+  updatedAt: string;
+  finalizedAt: string | null;
 }

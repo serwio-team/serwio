@@ -57,7 +57,22 @@ flowchart LR
 Proponowany termin musi mieścić się w godzinach dostępności lokalizacji i nie może
 kolidować z innymi wizytami wykonawców. Backend sprawdza to także w chwili akceptacji.
 
-### Technologie
+## Zrzuty ekranu
+
+<table>
+  <tr>
+    <td width="33%"><a href="docs/images/company-orders.png"><img src="docs/images/company-orders.png" alt="Lista zleceń firmy serwisowej ze statusami" /></a></td>
+    <td width="33%"><a href="docs/images/owner-visit-proposal.png"><img src="docs/images/owner-visit-proposal.png" alt="Właściciel akceptuje proponowany termin wizyty" /></a></td>
+    <td width="33%"><a href="docs/images/technician-order.png"><img src="docs/images/technician-order.png" alt="Szczegóły zlecenia i dostępność lokalizacji u serwisanta" /></a></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Firma serwisowa</b><br />lista zleceń ze statusami</td>
+    <td align="center"><b>Właściciel</b><br />akceptacja terminu wizyty</td>
+    <td align="center"><b>Serwisant</b><br />zlecenie i godziny lokalizacji</td>
+  </tr>
+</table>
+
+## Technologie
 
 [![Java][java-shield]][java-url]
 [![Spring Boot][spring-shield]][spring-url]

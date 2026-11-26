@@ -240,6 +240,22 @@ export interface TechnicianServiceOrderResponse extends ServiceOrderListItemResp
   coordinator: { id: string; displayName: string } | null;
 }
 
+export interface OrderAssignmentRequest {
+  expectedVersion: number;
+  branchIds: string[];
+  technicianIds: string[];
+  coordinatorTechnicianId: string;
+}
+
+export interface OrderAssignmentResponse {
+  serviceOrderId: string;
+  status: string;
+  version: number;
+  branches: { id: string; name: string }[];
+  technicians: { id: string; displayName: string; branchId: string }[];
+  coordinatorTechnicianId: string | null;
+}
+
 export interface VisitTimeRange {
   startsAt: string;
   endsAt: string;

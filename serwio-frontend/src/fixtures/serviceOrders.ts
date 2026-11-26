@@ -88,6 +88,8 @@ export const serviceOrderProblemFixtures = {
   forbidden: { status: 403, detail: 'Zlecenie może utworzyć tylko właściciel obiektu.' },
   objectNotFound: { status: 404, detail: 'Nie znaleziono aktywnego obiektu serwisowego.' },
   orderNotFound: { status: 404, detail: 'Nie znaleziono zlecenia.' },
+  assignmentConflict: { status: 409, detail: 'Przydział został zmieniony. Odśwież dane i spróbuj ponownie.' },
+  assignmentLocked: { status: 409, detail: 'Przydział można zmienić przed potwierdzeniem terminu wizyty.' },
   invalidQuery: { status: 400, detail: 'Nieprawidłowe parametry zapytania.' },
   companyUnavailable: { status: 503, detail: 'Firma serwisowa nie jest poprawnie skonfigurowana.' },
 };

@@ -3,6 +3,7 @@ import { Fragment } from 'react';
 import { Link, useOutletContext, useParams } from 'react-router-dom';
 import { ApiError, errorMessage } from '../api';
 import { EmptyState, ErrorState } from '../components/DataState';
+import { OrderAssignmentCard } from '../components/OrderAssignment';
 import { serviceOrderDescriptionLabel, serviceOrderTypeLabel } from '../components/ServiceOrderForm';
 import { ServiceWorkReport } from '../components/ServiceWorkReport';
 import { ServiceOrderStatusBadge } from '../components/StatusBadge';
@@ -76,6 +77,9 @@ export function ServiceOrderDetailsPage() {
           <ServiceWorkReport orderId={data.id} userId={user.id} orderStatus={data.currentStatus}
             orderType={data.orderType} coordinatorId={'coordinator' in data ? data.coordinator?.id : undefined} />
         </Fragment>
+      )}
+      {data && user.role === 'SERVICE_COMPANY' && (
+        <OrderAssignmentCard orderId={data.id} orderStatus={data.currentStatus} />
       )}
     </>
   );

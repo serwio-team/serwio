@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, PAGE_SIZE, api } from './api';
 import type {
+  OrderAssignmentRequest,
   AvailabilityRequest,
   LocationRequest,
   PasswordChangeRequest,
@@ -32,6 +33,7 @@ export const queryKeys = {
   serviceOrders: ['service-orders'] as const,
   serviceOrderList: (statuses: string[]) => ['service-orders', 'list', statuses.join(',')] as const,
   companyOrderList: (status?: string) => ['service-orders', 'company', status ?? 'all'] as const,
+  orderAssignment: (id: string) => ['service-orders', 'assignment', id] as const,
   serviceOrder: (id: string) => ['service-orders', 'detail', id] as const,
   technicianOrderList: (userId: string) => ['technician-orders', userId, 'list'] as const,
   technicianOrder: (userId: string, id: string) => ['technician-orders', userId, 'detail', id] as const,
@@ -43,6 +45,7 @@ export const queryKeys = {
   allBranches: ['branches', 'all'] as const,
   branch: (id: string) => ['branches', 'detail', id] as const,
   technicians: ['technicians'] as const,
+  allTechnicians: ['technicians', 'all'] as const,
   technicianList: (branchId?: string) => ['technicians', 'list', branchId ?? 'all'] as const,
   technician: (id: string) => ['technicians', 'detail', id] as const,
 };
@@ -192,6 +195,40 @@ export function useCompanyServiceOrderList(status: string | undefined) {
     initialPageParam: 0,
     getNextPageParam: nextPage,
   });
+}
+
+export function useOrderAssignment(id: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.orderAssignment(id),
+    queryFn: () => api.getOrderAssignment(id),
+    enabled,
+  });
+}
+
+export function useSaveOrderAssignment(id: string) {
+  const queryClient = useQueryClient();
+  const refreshOrder = () =>
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.serviceOrders,
+      predicate: (query) => query.queryKey[1] !== 'assignment' || query.queryKey[2] === id,
+    });
+  return useMutation({
+    mutationFn: (data: OrderAssignmentRequest) => api.saveOrderAssignment(id, data),
+    onSuccess: (saved) => {
+      queryClient.setQueryData(queryKeys.orderAssignment(id), saved);
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.serviceOrders,
+        predicate: (query) => query.queryKey[1] !== 'assignment',
+      });
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && (error.status === 404 || error.status === 409)) void refreshOrder();
+    },
+  });
+}
+
+export function useAllTechnicians() {
+  return useQuery({ queryKey: queryKeys.allTechnicians, queryFn: api.allTechnicians });
 }
 
 export function useTechnicianServiceOrderList(userId: string) {

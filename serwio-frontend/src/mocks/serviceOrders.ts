@@ -2,13 +2,18 @@ import { serviceOrderFixtures, serviceOrderHistoryFixtures, serviceOrderProblemF
 import type {
   AssetOwnerResponse,
   LocationResponse,
+  OrderAssignmentResponse,
+  ServiceBranchResponse,
   ServiceObjectResponse,
   ServiceOrderListItemResponse,
   ServiceOrderResponse,
+  TechnicianResponse,
   UserAccountResponse,
 } from '../types';
 
 const STORAGE_KEY = 'serwio:mock-service-orders';
+const ASSIGNMENT_KEY = 'serwio:mock-order-assignments';
+const ASSIGNABLE_STATUSES = ['NEW', 'ASSIGNED', 'AWAITING_SCHEDULING', 'REVISIT_REQUIRED'];
 const ORDER_TYPES = ['REPAIR', 'INSPECTION'];
 const QUERY_STATUSES = [
   'NEW', 'ASSIGNED', 'AWAITING_SCHEDULING', 'VISIT_CONFIRMED', 'IN_PROGRESS', 'REVISIT_REQUIRED', 'COMPLETED',
@@ -147,6 +152,105 @@ function list(params: URLSearchParams): Response {
   return json(200, items);
 }
 
+function readAssignments(): Record<string, OrderAssignmentResponse> {
+  try {
+    return JSON.parse(sessionStorage.getItem(ASSIGNMENT_KEY) ?? '{}') as Record<string, OrderAssignmentResponse>;
+  } catch {
+    return {};
+  }
+}
+
+function saveAssignment(assignment: OrderAssignmentResponse) {
+  try {
+    sessionStorage.setItem(ASSIGNMENT_KEY, JSON.stringify({ ...readAssignments(), [assignment.serviceOrderId]: assignment }));
+  } catch {
+    return;
+  }
+}
+
+function currentAssignment(order: ServiceOrderResponse): OrderAssignmentResponse {
+  const stored = readAssignments()[order.id];
+  if (stored) return { ...stored, status: order.currentStatus };
+  return {
+    serviceOrderId: order.id,
+    status: order.currentStatus,
+    version: 0,
+    branches: [],
+    technicians: [],
+    coordinatorTechnicianId: null,
+  };
+}
+
+function invalidField(field: string, message: string): Response {
+  return problem({ ...serviceOrderProblemFixtures.validation, errors: { [field]: [message] } });
+}
+
+function idList(value: unknown): string[] | null {
+  return Array.isArray(value) && value.every((v) => typeof v === 'string' && v) ? (value as string[]) : null;
+}
+
+async function replaceAssignment(id: string, body: Record<string, unknown>): Promise<Response> {
+  const branchIds = idList(body.branchIds);
+  const technicianIds = idList(body.technicianIds);
+  const coordinatorId = typeof body.coordinatorTechnicianId === 'string' ? body.coordinatorTechnicianId : '';
+  if (!branchIds || !technicianIds || !coordinatorId || typeof body.expectedVersion !== 'number') {
+    return problem({ status: 400, detail: 'Popraw nieprawidłowe pola żądania.' });
+  }
+  if (new Set(branchIds).size !== branchIds.length) return invalidField('branchIds', 'Identyfikatory nie mogą się powtarzać.');
+  if (new Set(technicianIds).size !== technicianIds.length) {
+    return invalidField('technicianIds', 'Identyfikatory nie mogą się powtarzać.');
+  }
+  if (branchIds.length === 0 && technicianIds.length === 0) {
+    return invalidField('branchIds', 'Wybierz co najmniej jeden oddział lub serwisanta.');
+  }
+  const order = allOrders().find((o) => o.id === id);
+  if (!order) return problem(serviceOrderProblemFixtures.orderNotFound);
+  if (!ASSIGNABLE_STATUSES.includes(order.currentStatus)) return problem(serviceOrderProblemFixtures.assignmentLocked);
+  const current = currentAssignment(order);
+  if (body.expectedVersion !== current.version) return problem(serviceOrderProblemFixtures.assignmentConflict);
+
+  const [branches, technicians] = await Promise.all([
+    load<ServiceBranchResponse[]>('/api/branches?page=0&size=100'),
+    load<TechnicianResponse[]>('/api/technicians?page=0&size=100'),
+  ]);
+  if (branches.failure) return branches.failure;
+  if (technicians.failure) return technicians.failure;
+  const selectedBranches = branches.data!.filter((b) => b.active && branchIds.includes(b.id));
+  if (selectedBranches.length !== branchIds.length) {
+    return invalidField('branchIds', 'Oddział jest nieaktywny lub nie należy do firmy.');
+  }
+  const usable = technicians.data!.filter((t) => t.active && t.accountStatus === 'ACTIVE');
+  const selectedTechnicians = usable.filter((t) => technicianIds.includes(t.id));
+  if (selectedTechnicians.length !== technicianIds.length) {
+    return invalidField('technicianIds', 'Serwisant jest nieaktywny lub nie należy do firmy.');
+  }
+  const coordinator = usable.find((t) => t.id === coordinatorId);
+  if (!coordinator) return invalidField('coordinatorTechnicianId', 'Koordynator jest nieaktywny lub nie należy do firmy.');
+  if (!technicianIds.includes(coordinator.id) && !branchIds.includes(coordinator.branchId)) {
+    return invalidField('coordinatorTechnicianId', 'Koordynator musi być objęty przydziałem.');
+  }
+
+  const unchanged = current.coordinatorTechnicianId === coordinatorId
+    && current.branches.length === branchIds.length && current.branches.every((b) => branchIds.includes(b.id))
+    && current.technicians.length === technicianIds.length && current.technicians.every((t) => technicianIds.includes(t.id));
+  if (unchanged) return json(200, current);
+
+  const status = order.currentStatus === 'NEW' ? 'ASSIGNED' : order.currentStatus;
+  if (status !== order.currentStatus) save({ ...order, currentStatus: status });
+  const saved: OrderAssignmentResponse = {
+    serviceOrderId: order.id,
+    status,
+    version: current.version + 1,
+    branches: selectedBranches.map((b) => ({ id: b.id, name: b.name })).sort((a, b) => a.name.localeCompare(b.name)),
+    technicians: selectedTechnicians
+      .map((t) => ({ id: t.id, displayName: t.displayName, branchId: t.branchId }))
+      .sort((a, b) => a.displayName.localeCompare(b.displayName)),
+    coordinatorTechnicianId: coordinatorId,
+  };
+  saveAssignment(saved);
+  return json(200, saved);
+}
+
 export async function mockServiceOrderFetch(url: string, init: RequestInit = {}): Promise<Response> {
   await new Promise((resolve) => setTimeout(resolve, 400));
   const [path, query = ''] = url.split('?');
@@ -157,6 +261,16 @@ export async function mockServiceOrderFetch(url: string, init: RequestInit = {})
     return create(body);
   }
   if (path === '/api/service-orders' && method === 'GET') return list(new URLSearchParams(query));
+  const assignmentMatch = /^\/api\/service-orders\/([^/]+)\/assignment$/.exec(path);
+  if (assignmentMatch) {
+    const id = decodeURIComponent(assignmentMatch[1]);
+    if (method === 'PUT') {
+      const body = typeof init.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : {};
+      return replaceAssignment(id, body);
+    }
+    const order = allOrders().find((o) => o.id === id);
+    return order ? json(200, currentAssignment(order)) : problem(serviceOrderProblemFixtures.orderNotFound);
+  }
   const match = /^\/api\/service-orders\/([^/]+)$/.exec(path);
   if (match && method === 'GET') return find(decodeURIComponent(match[1]));
   return problem({ status: 404, detail: 'Brak takiego zasobu w mocku zleceń.' });

@@ -1,5 +1,7 @@
 import { mockServiceOrderFetch } from './mocks/serviceOrders';
 import type {
+  OrderAssignmentRequest,
+  OrderAssignmentResponse,
   AvailabilityRequest,
   AvailabilityResponse,
   AssetOwnerResponse,
@@ -99,7 +101,7 @@ async function readBody<T>(response: Response): Promise<T> {
 }
 
 function request(url: string, init?: RequestInit): Promise<Response> {
-  const mockable = /^\/api\/service-orders(?:\/[^/]+)?$/.test(url.split('?')[0]);
+  const mockable = /^\/api\/service-orders(?:\/[^/]+(?:\/assignment)?)?$/.test(url.split('?')[0]);
   return MOCK_SERVICE_ORDERS && mockable ? mockServiceOrderFetch(url, init) : fetch(url, init);
 }
 
@@ -235,6 +237,10 @@ export const api = {
   getServiceOrder: (id: string) => get<ServiceOrderResponse>(`/api/service-orders/${encodeURIComponent(id)}`),
   listCompanyServiceOrders: (page: number, status?: string) =>
     get<ServiceOrderListItemResponse[]>(`/api/service-orders?${pageQuery(page, PAGE_SIZE, { status })}`),
+  getOrderAssignment: (id: string) =>
+    get<OrderAssignmentResponse>(`/api/service-orders/${encodeURIComponent(id)}/assignment`),
+  saveOrderAssignment: (id: string, data: OrderAssignmentRequest) =>
+    mutate<OrderAssignmentResponse>('PUT', `/api/service-orders/${encodeURIComponent(id)}/assignment`, data),
   listTechnicianServiceOrders: (page: number) =>
     get<ServiceOrderListItemResponse[]>(`/api/service-orders?${pageQuery(page, PAGE_SIZE)}`, fetch),
   getTechnicianServiceOrder: (id: string) =>
@@ -269,6 +275,7 @@ export const api = {
 
   listTechnicians: (page: number, branchId?: string) =>
     get<TechnicianResponse[]>(`/api/technicians?${pageQuery(page, PAGE_SIZE, { branchId })}`),
+  allTechnicians: () => getAllPages<TechnicianResponse>('/api/technicians'),
   getTechnician: (id: string) => get<TechnicianResponse>(`/api/technicians/${encodeURIComponent(id)}`),
   createTechnician: (data: TechnicianCreateRequest) => mutate<TechnicianResponse>('POST', '/api/technicians', data),
   updateTechnician: (id: string, data: TechnicianUpdateRequest) =>

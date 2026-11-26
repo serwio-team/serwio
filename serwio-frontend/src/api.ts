@@ -11,6 +11,7 @@ import type {
   LocationRequest,
   LocationResponse,
   PasswordChangeRequest,
+  ReportDraftRequest,
   ServiceBranchRequest,
   ServiceBranchResponse,
   ServiceCompanyResponse,
@@ -20,6 +21,9 @@ import type {
   ServiceOrderListItemResponse,
   ServiceOrderRequest,
   ServiceOrderResponse,
+  ServiceReport,
+  ServiceVisit,
+  ServiceVisitsResponse,
   TechnicianCreateRequest,
   TechnicianPasswordRequest,
   TechnicianProfileResponse,
@@ -27,6 +31,7 @@ import type {
   TechnicianServiceOrderResponse,
   TechnicianUpdateRequest,
   UserAccountResponse,
+  VisitAction,
 } from './types';
 
 export const PAGE_SIZE = 20;
@@ -43,6 +48,7 @@ export class ApiError extends Error {
     readonly status: number,
     message: string,
     readonly fieldErrors: Record<string, string[]> = {},
+    readonly code?: string,
   ) {
     super(message);
   }
@@ -78,7 +84,7 @@ function defaultMessage(status: number): string {
 
 async function toApiError(response: Response): Promise<ApiError> {
   const body = (await response.json().catch(() => null)) as
-    | { detail?: string; errors?: Record<string, string[]> }
+    | { detail?: string; errors?: Record<string, string[]>; code?: string }
     | null;
   if (response.status === 401) {
     csrfCache = null;
@@ -86,7 +92,7 @@ async function toApiError(response: Response): Promise<ApiError> {
   }
   const message =
     (response.status === 400 || response.status === 409) && body?.detail ? body.detail : defaultMessage(response.status);
-  return new ApiError(response.status, message, body?.errors ?? {});
+  return new ApiError(response.status, message, body?.errors ?? {}, body?.code);
 }
 
 async function readBody<T>(response: Response): Promise<T> {
@@ -95,7 +101,8 @@ async function readBody<T>(response: Response): Promise<T> {
 }
 
 function request(url: string, init?: RequestInit): Promise<Response> {
-  return MOCK_SERVICE_ORDERS && url.startsWith('/api/service-orders') ? mockServiceOrderFetch(url, init) : fetch(url, init);
+  const mockable = /^\/api\/service-orders(?:\/[^/]+(?:\/assignment)?)?$/.test(url.split('?')[0]);
+  return MOCK_SERVICE_ORDERS && mockable ? mockServiceOrderFetch(url, init) : fetch(url, init);
 }
 
 async function get<T>(url: string, fetcher = request): Promise<T> {
@@ -145,6 +152,14 @@ async function getAllPages<T>(path: string): Promise<T[]> {
 export interface ServiceOrderPage {
   items: ServiceOrderListItemResponse[];
   nextPage?: number;
+}
+
+function visitPath(orderId: string) {
+  return `/api/service-orders/${encodeURIComponent(orderId)}/visits`;
+}
+
+function reportPath(orderId: string) {
+  return `/api/service-orders/${encodeURIComponent(orderId)}/report`;
 }
 
 async function listServiceOrders(statuses: string[], page: number): Promise<ServiceOrderPage> {
@@ -230,6 +245,23 @@ export const api = {
     get<ServiceOrderListItemResponse[]>(`/api/service-orders?${pageQuery(page, PAGE_SIZE)}`, fetch),
   getTechnicianServiceOrder: (id: string) =>
     get<TechnicianServiceOrderResponse>(`/api/service-orders/${encodeURIComponent(id)}`, fetch),
+  listServiceVisits: (orderId: string) => get<ServiceVisitsResponse>(visitPath(orderId)),
+  getServiceReport: (orderId: string) => get<ServiceReport>(reportPath(orderId)),
+  saveReportDraft: (orderId: string, draft: ReportDraftRequest) =>
+    mutate<ServiceReport>('PUT', reportPath(orderId), draft),
+  finalizeReport: (orderId: string) => mutate<ServiceReport>('POST', `${reportPath(orderId)}/finalize`),
+  updateServiceVisit(orderId: string, action: VisitAction) {
+    const visit = `${visitPath(orderId)}/${encodeURIComponent(action.visitId)}`;
+    if (action.action === 'start') return mutate<ServiceVisit>('POST', `${visit}/start`);
+    if (action.action === 'complete') {
+      return mutate<ServiceVisit>('POST', `${visit}/complete`, { outcome: action.outcome });
+    }
+    const proposals = `${visit}/proposals`;
+    const path = action.action === 'propose'
+      ? proposals
+      : `${proposals}/${encodeURIComponent(action.proposalId)}/${action.action}`;
+    return mutate<ServiceVisit>('POST', path, 'time' in action ? action.time : undefined);
+  },
 
   companySummary: () => get<CompanySummaryResponse>('/api/companies/me/summary'),
 

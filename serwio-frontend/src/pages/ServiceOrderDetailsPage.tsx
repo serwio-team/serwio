@@ -1,4 +1,5 @@
 import { ArrowLeft, SearchX, ShieldAlert } from 'lucide-react';
+import { Fragment } from 'react';
 import { Link, useOutletContext, useParams } from 'react-router-dom';
 import { ApiError, errorMessage } from '../api';
 import { EmptyState, ErrorState } from '../components/DataState';
@@ -6,7 +7,9 @@ import { OrderAssignmentCard } from '../components/OrderAssignment';
 import { OrderOutcomeCard } from '../components/OrderOutcome';
 import { OrderVisitsCard } from '../components/OrderVisits';
 import { serviceOrderDescriptionLabel, serviceOrderTypeLabel } from '../components/ServiceOrderForm';
+import { ServiceWorkReport } from '../components/ServiceWorkReport';
 import { ServiceOrderStatusBadge } from '../components/StatusBadge';
+import { VisitScheduling } from '../components/VisitScheduling';
 import { useServiceOrder } from '../queries';
 import type { ServiceOrderResponse, TechnicianServiceOrderResponse, UserAccountResponse } from '../types';
 
@@ -69,6 +72,14 @@ export function ServiceOrderDetailsPage() {
       </header>
 
       {data ? <OrderDetails order={data} role={user.role} /> : <OrderDetailsSkeleton />}
+      {data && technician && (
+        <Fragment key={data.id}>
+          <VisitScheduling orderId={data.id} userId={user.id}
+            orderStatus={data.currentStatus} onRefreshOrder={() => void order.refetch()} />
+          <ServiceWorkReport orderId={data.id} userId={user.id} orderStatus={data.currentStatus}
+            orderType={data.orderType} coordinatorId={'coordinator' in data ? data.coordinator?.id : undefined} />
+        </Fragment>
+      )}
       {data && !technician && 'reportFinalized' in data && <OrderOutcomeCard order={data} role={user.role} />}
       {data && user.role === 'ASSET_OWNER' && (
         <OrderVisitsCard orderId={data.id} orderStatus={data.currentStatus} role={user.role} />

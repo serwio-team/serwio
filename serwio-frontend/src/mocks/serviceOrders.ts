@@ -357,7 +357,7 @@ function cancelVisit(order: ServiceOrderResponse, visitId: string): Response {
   if (confirmed && (!visit.startsAt || new Date(visit.startsAt) <= new Date())) {
     return visitConflict('INVALID_VISIT_STATE', 'Potwierdzoną wizytę można anulować przed jej rozpoczęciem.');
   }
-  const cancelled = { ...visit, status: 'CANCELLED', currentProposal: null };
+  const cancelled: ServiceVisitResponse = { ...visit, status: 'CANCELLED', currentProposal: null };
   saveVisits(order.id, visits.map((v) => (v.id === visitId ? cancelled : v)));
   const revisit = visits.some((v) => v.status === 'COMPLETED' && v.outcome === 'REVISIT_REQUIRED');
   save({ ...order, currentStatus: revisit ? 'REVISIT_REQUIRED' : 'ASSIGNED' });

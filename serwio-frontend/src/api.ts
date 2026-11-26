@@ -1,5 +1,10 @@
 import { mockServiceOrderFetch } from './mocks/serviceOrders';
 import type {
+  ServiceReportResponse,
+  ServiceVisitResponse,
+  ServiceVisitsResponse,
+  VisitStaffingRequest,
+  VisitTechnicianResponse,
   OrderAssignmentRequest,
   OrderAssignmentResponse,
   AvailabilityRequest,
@@ -21,9 +26,6 @@ import type {
   ServiceOrderListItemResponse,
   ServiceOrderRequest,
   ServiceOrderResponse,
-  ServiceReport,
-  ServiceVisit,
-  ServiceVisitsResponse,
   TechnicianCreateRequest,
   TechnicianPasswordRequest,
   TechnicianProfileResponse,
@@ -101,7 +103,7 @@ async function readBody<T>(response: Response): Promise<T> {
 }
 
 function request(url: string, init?: RequestInit): Promise<Response> {
-  const mockable = /^\/api\/service-orders(?:\/[^/]+(?:\/assignment)?)?$/.test(url.split('?')[0]);
+  const mockable = /^\/api\/service-orders(?:[/?]|$)/.test(url);
   return MOCK_SERVICE_ORDERS && mockable ? mockServiceOrderFetch(url, init) : fetch(url, init);
 }
 
@@ -111,24 +113,24 @@ async function get<T>(url: string, fetcher = request): Promise<T> {
   return readBody<T>(response);
 }
 
-async function send(method: string, url: string, body: unknown, csrf: CsrfToken): Promise<Response> {
+async function send(method: string, url: string, body: unknown, csrf: CsrfToken, fetcher: typeof request): Promise<Response> {
   const headers: Record<string, string> = { Accept: 'application/json', [csrf.headerName]: csrf.token };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
-  return request(url, {
+  return fetcher(url, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 }
 
-async function mutate<T>(method: string, url: string, body?: unknown, anonymous = false): Promise<T> {
-  let response = await send(method, url, body, csrfCache ?? (await fetchCsrf()));
+async function mutate<T>(method: string, url: string, body?: unknown, { anonymous = false, fetcher = request } = {}): Promise<T> {
+  let response = await send(method, url, body, csrfCache ?? (await fetchCsrf()), fetcher);
   if (anonymous && (response.status === 401 || response.status === 403)) {
-    response = await send(method, url, body, await fetchCsrf());
+    response = await send(method, url, body, await fetchCsrf(), fetcher);
   } else if (response.status === 403) {
     const session = await fetch('/api', { headers: { Accept: 'application/json' } });
     if (session.status === 401) throw await toApiError(session);
-    if (session.ok) response = await send(method, url, body, await fetchCsrf());
+    if (session.ok) response = await send(method, url, body, await fetchCsrf(), fetcher);
   }
   if (!response.ok) throw await toApiError(response);
   return readBody<T>(response);
@@ -177,7 +179,7 @@ async function listServiceOrders(statuses: string[], page: number): Promise<Serv
 
 export const api = {
   registerOwner: (data: OwnerRegistrationRequest) =>
-    mutate<UserAccountResponse>('POST', '/api/auth/register/owner', data, true),
+    mutate<UserAccountResponse>('POST', '/api/auth/register/owner', data, { anonymous: true }),
   currentUser: () => get<UserAccountResponse>('/api/users/me'),
   currentOwner: () => get<AssetOwnerResponse>('/api/owners/me'),
   currentCompany: () => get<ServiceCompanyResponse>('/api/companies/me'),
@@ -241,26 +243,44 @@ export const api = {
     get<OrderAssignmentResponse>(`/api/service-orders/${encodeURIComponent(id)}/assignment`),
   saveOrderAssignment: (id: string, data: OrderAssignmentRequest) =>
     mutate<OrderAssignmentResponse>('PUT', `/api/service-orders/${encodeURIComponent(id)}/assignment`, data),
+  getOrderVisits: (id: string) =>
+    get<ServiceVisitsResponse>(visitPath(id)),
+  getVisitCandidates: (id: string) =>
+    get<VisitTechnicianResponse[]>(`/api/service-orders/${encodeURIComponent(id)}/visits/candidates`),
+  createVisit: (id: string, data: VisitStaffingRequest) =>
+    mutate<ServiceVisitResponse>('POST', `/api/service-orders/${encodeURIComponent(id)}/visits`, data),
+  updateVisitStaffing: (id: string, visitId: string, data: VisitStaffingRequest) =>
+    mutate<ServiceVisitResponse>(
+      'PUT',
+      `/api/service-orders/${encodeURIComponent(id)}/visits/${encodeURIComponent(visitId)}/staffing`,
+      data,
+    ),
+  cancelVisit: (id: string, visitId: string) =>
+    mutate<ServiceVisitResponse>(
+      'POST',
+      `/api/service-orders/${encodeURIComponent(id)}/visits/${encodeURIComponent(visitId)}/cancel`,
+    ),
   listTechnicianServiceOrders: (page: number) =>
     get<ServiceOrderListItemResponse[]>(`/api/service-orders?${pageQuery(page, PAGE_SIZE)}`, fetch),
   getTechnicianServiceOrder: (id: string) =>
     get<TechnicianServiceOrderResponse>(`/api/service-orders/${encodeURIComponent(id)}`, fetch),
-  listServiceVisits: (orderId: string) => get<ServiceVisitsResponse>(visitPath(orderId)),
-  getServiceReport: (orderId: string) => get<ServiceReport>(reportPath(orderId)),
+  getTechnicianServiceVisits: (orderId: string) => get<ServiceVisitsResponse>(visitPath(orderId), fetch),
+  getTechnicianServiceReport: (orderId: string) => get<ServiceReportResponse>(reportPath(orderId), fetch),
   saveReportDraft: (orderId: string, draft: ReportDraftRequest) =>
-    mutate<ServiceReport>('PUT', reportPath(orderId), draft),
-  finalizeReport: (orderId: string) => mutate<ServiceReport>('POST', `${reportPath(orderId)}/finalize`),
+    mutate<ServiceReportResponse>('PUT', reportPath(orderId), draft, { fetcher: fetch }),
+  finalizeReport: (orderId: string) =>
+    mutate<ServiceReportResponse>('POST', `${reportPath(orderId)}/finalize`, undefined, { fetcher: fetch }),
   updateServiceVisit(orderId: string, action: VisitAction) {
     const visit = `${visitPath(orderId)}/${encodeURIComponent(action.visitId)}`;
-    if (action.action === 'start') return mutate<ServiceVisit>('POST', `${visit}/start`);
+    if (action.action === 'start') return mutate<ServiceVisitResponse>('POST', `${visit}/start`, undefined, { fetcher: fetch });
     if (action.action === 'complete') {
-      return mutate<ServiceVisit>('POST', `${visit}/complete`, { outcome: action.outcome });
+      return mutate<ServiceVisitResponse>('POST', `${visit}/complete`, { outcome: action.outcome }, { fetcher: fetch });
     }
     const proposals = `${visit}/proposals`;
     const path = action.action === 'propose'
       ? proposals
       : `${proposals}/${encodeURIComponent(action.proposalId)}/${action.action}`;
-    return mutate<ServiceVisit>('POST', path, 'time' in action ? action.time : undefined);
+    return mutate<ServiceVisitResponse>('POST', path, 'time' in action ? action.time : undefined, { fetcher: fetch });
   },
 
   companySummary: () => get<CompanySummaryResponse>('/api/companies/me/summary'),

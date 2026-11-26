@@ -3,12 +3,12 @@ import { useState, type FormEvent } from 'react';
 import { ApiError, errorMessage } from '../api';
 import { editableWeek, WEEKDAYS } from '../availability';
 import { useCurrentTechnician, useServiceVisits, useUpdateServiceVisit } from '../queries';
-import type { ServiceVisit, ServiceVisitsResponse, VisitAction, VisitOutcome } from '../types';
+import type { ServiceVisitResponse, ServiceVisitsResponse, VisitAction, VisitOutcome } from '../types';
 import { EmptyState, ErrorState } from './DataState';
 import { SelectField } from './Field';
 import { VisitTimeForm } from './VisitTimeForm';
 
-const STATUS_LABELS: Record<ServiceVisit['status'], string> = {
+const STATUS_LABELS: Record<ServiceVisitResponse['status'], string> = {
   DRAFT: 'W uzgodnieniu',
   CONFIRMED: 'Potwierdzona',
   IN_PROGRESS: 'W realizacji',
@@ -113,7 +113,7 @@ function WeeklyAvailability({ availability, timezone }: Pick<ServiceVisitsRespon
 }
 
 interface VisitCardProps {
-  visit: ServiceVisit;
+  visit: ServiceVisitResponse;
   timezone: string;
   orderStatus: string;
   isCoordinator: boolean;

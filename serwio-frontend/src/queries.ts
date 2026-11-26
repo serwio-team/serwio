@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, PAGE_SIZE, api } from './api';
 import type {
+  VisitStaffingRequest,
   OrderAssignmentRequest,
   AvailabilityRequest,
   LocationRequest,
@@ -34,11 +35,13 @@ export const queryKeys = {
   serviceOrderList: (statuses: string[]) => ['service-orders', 'list', statuses.join(',')] as const,
   companyOrderList: (status?: string) => ['service-orders', 'company', status ?? 'all'] as const,
   orderAssignment: (id: string) => ['service-orders', 'assignment', id] as const,
+  orderVisits: (id: string) => ['service-orders', 'visits', id] as const,
+  visitCandidates: (id: string) => ['service-orders', 'visit-candidates', id] as const,
   serviceOrder: (id: string) => ['service-orders', 'detail', id] as const,
   technicianOrderList: (userId: string) => ['technician-orders', userId, 'list'] as const,
   technicianOrder: (userId: string, id: string) => ['technician-orders', userId, 'detail', id] as const,
   serviceVisits: (userId: string, orderId: string) => ['service-visits', userId, orderId] as const,
-  serviceReport: (userId: string, orderId: string) => ['service-report', userId, orderId] as const,
+  technicianServiceReport: (userId: string, orderId: string) => ['service-report', userId, orderId] as const,
   companySummary: ['companies', 'me', 'summary'] as const,
   branches: ['branches'] as const,
   branchList: ['branches', 'list'] as const,
@@ -227,6 +230,35 @@ export function useSaveOrderAssignment(id: string) {
   });
 }
 
+export function useOrderVisits(id: string) {
+  return useQuery({ queryKey: queryKeys.orderVisits(id), queryFn: () => api.getOrderVisits(id) });
+}
+
+export function useVisitCandidates(id: string) {
+  return useQuery({ queryKey: queryKeys.visitCandidates(id), queryFn: () => api.getVisitCandidates(id) });
+}
+
+function useVisitMutation<T>(mutationFn: (variables: T) => Promise<unknown>) {
+  const queryClient = useQueryClient();
+  const refresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.serviceOrders });
+  return useMutation({
+    mutationFn,
+    onSuccess: refresh,
+    onError: (error) => {
+      if (error instanceof ApiError && (error.status === 404 || error.status === 409)) void refresh();
+    },
+  });
+}
+
+export function useSaveVisitStaffing(orderId: string) {
+  return useVisitMutation(({ visitId, data }: { visitId?: string; data: VisitStaffingRequest }) =>
+    visitId ? api.updateVisitStaffing(orderId, visitId, data) : api.createVisit(orderId, data));
+}
+
+export function useCancelVisit(orderId: string) {
+  return useVisitMutation((visitId: string) => api.cancelVisit(orderId, visitId));
+}
+
 export function useAllTechnicians() {
   return useQuery({ queryKey: queryKeys.allTechnicians, queryFn: api.allTechnicians });
 }
@@ -251,7 +283,7 @@ export function useServiceOrder(id: string | undefined, technicianUserId?: strin
 export function useServiceVisits(userId: string, orderId: string) {
   return useQuery({
     queryKey: queryKeys.serviceVisits(userId, orderId),
-    queryFn: () => api.listServiceVisits(orderId),
+    queryFn: () => api.getTechnicianServiceVisits(orderId),
   });
 }
 
@@ -274,12 +306,12 @@ export function useUpdateServiceVisit(userId: string, orderId: string) {
   });
 }
 
-export function useServiceReport(userId: string, orderId: string) {
+export function useTechnicianServiceReport(userId: string, orderId: string) {
   return useQuery({
-    queryKey: queryKeys.serviceReport(userId, orderId),
+    queryKey: queryKeys.technicianServiceReport(userId, orderId),
     queryFn: async () => {
       try {
-        return await api.getServiceReport(orderId);
+        return await api.getTechnicianServiceReport(orderId);
       } catch (error) {
         if (isNotFound(error)) return null;
         throw error;
@@ -294,7 +326,7 @@ type ReportUpdate =
 
 export function useUpdateServiceReport(userId: string, orderId: string) {
   const queryClient = useQueryClient();
-  const key = queryKeys.serviceReport(userId, orderId);
+  const key = queryKeys.technicianServiceReport(userId, orderId);
 
   return useMutation({
     onMutate: () => queryClient.cancelQueries({ queryKey: key }),

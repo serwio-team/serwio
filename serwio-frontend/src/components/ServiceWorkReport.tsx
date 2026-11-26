@@ -1,8 +1,8 @@
 import { FileText, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { ApiError, errorMessage } from '../api';
-import { useCurrentTechnician, useServiceReport, useUpdateServiceReport } from '../queries';
-import type { ReportDraftRequest, ServiceReport } from '../types';
+import { useCurrentTechnician, useTechnicianServiceReport, useUpdateServiceReport } from '../queries';
+import type { ReportDraftRequest, ServiceReportResponse } from '../types';
 import { EmptyState, ErrorState } from './DataState';
 import { TextareaField } from './Field';
 
@@ -24,7 +24,7 @@ export function ServiceWorkReport({ orderId, orderStatus, orderType, coordinator
   userId: string;
 }) {
   const profile = useCurrentTechnician();
-  const query = useServiceReport(userId, orderId);
+  const query = useTechnicianServiceReport(userId, orderId);
   const update = useUpdateServiceReport(userId, orderId);
   const report = query.data;
   const open = orderStatus !== 'CLOSED' && orderStatus !== 'CANCELLED';
@@ -57,7 +57,7 @@ export function ServiceWorkReport({ orderId, orderStatus, orderType, coordinator
 }
 
 function ReportForm({ report, orderType, canFinalize, update }: {
-  report: ServiceReport | null;
+  report: ServiceReportResponse | null;
   orderType: string;
   canFinalize: boolean;
   update: ReturnType<typeof useUpdateServiceReport>;
@@ -136,7 +136,7 @@ function ReportForm({ report, orderType, canFinalize, update }: {
   );
 }
 
-function FinalReport({ report, orderType }: { report: ServiceReport; orderType: string }) {
+function FinalReport({ report, orderType }: { report: ServiceReportResponse; orderType: string }) {
   const fields: [keyof ReportDraftRequest, string][] = [
     ...reportFields(orderType),
     ['usedMaterials', 'Użyte materiały'],

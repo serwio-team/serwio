@@ -4,6 +4,7 @@ import { Link, useOutletContext, useParams } from 'react-router-dom';
 import { ApiError, errorMessage } from '../api';
 import { EmptyState, ErrorState } from '../components/DataState';
 import { OrderAssignmentCard } from '../components/OrderAssignment';
+import { OrderVisitsCard } from '../components/OrderVisits';
 import { serviceOrderDescriptionLabel, serviceOrderTypeLabel } from '../components/ServiceOrderForm';
 import { ServiceWorkReport } from '../components/ServiceWorkReport';
 import { ServiceOrderStatusBadge } from '../components/StatusBadge';
@@ -79,7 +80,10 @@ export function ServiceOrderDetailsPage() {
         </Fragment>
       )}
       {data && user.role === 'SERVICE_COMPANY' && (
-        <OrderAssignmentCard orderId={data.id} orderStatus={data.currentStatus} />
+        <>
+          <OrderAssignmentCard orderId={data.id} orderStatus={data.currentStatus} />
+          <OrderVisitsCard orderId={data.id} orderStatus={data.currentStatus} />
+        </>
       )}
     </>
   );

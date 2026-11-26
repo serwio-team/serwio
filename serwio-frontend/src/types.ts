@@ -256,32 +256,41 @@ export interface OrderAssignmentResponse {
   coordinatorTechnicianId: string | null;
 }
 
+export interface VisitTechnicianResponse {
+  id: string;
+  displayName: string;
+  branchId: string;
+}
+
 export interface VisitTimeRange {
   startsAt: string;
   endsAt: string;
 }
 
-export interface VisitProposal extends VisitTimeRange {
+export interface VisitProposalResponse extends VisitTimeRange {
   id: string;
   proposedBy: 'OWNER' | 'COORDINATOR';
 }
 
 export type VisitOutcome = 'COMPLETED' | 'REVISIT_REQUIRED';
 
-export interface ServiceVisit {
+export interface ServiceVisitResponse {
   id: string;
   status: 'DRAFT' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   coordinatorTechnicianId: string;
-  currentProposal: VisitProposal | null;
+  technicians: VisitTechnicianResponse[];
+  currentProposal: VisitProposalResponse | null;
   startsAt: string | null;
   endsAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
   outcome: VisitOutcome | null;
 }
 
 export interface ServiceVisitsResponse {
   timezone: string;
   availability: AvailabilityDay[];
-  visits: ServiceVisit[];
+  visits: ServiceVisitResponse[];
 }
 
 export type VisitAction =
@@ -291,6 +300,11 @@ export type VisitAction =
   | { action: 'start'; visitId: string }
   | { action: 'complete'; visitId: string; outcome: VisitOutcome };
 
+export interface VisitStaffingRequest {
+  technicianIds: string[];
+  coordinatorTechnicianId: string;
+}
+
 export interface ReportDraftRequest {
   actionsDone: string | null;
   diagnosis: string | null;
@@ -299,7 +313,7 @@ export interface ReportDraftRequest {
   recommendations: string | null;
 }
 
-export interface ServiceReport extends ReportDraftRequest {
+export interface ServiceReportResponse extends ReportDraftRequest {
   id: string;
   serviceOrderId: string;
   authorTechnicianId: string;

@@ -272,11 +272,14 @@ export const api = {
       `/api/service-orders/${encodeURIComponent(id)}/visits/${encodeURIComponent(visitId)}/proposals/${encodeURIComponent(proposalId)}/counter`,
       data,
     ),
+  endServiceOrder: (id: string, action: 'cancel' | 'close') =>
+    mutate<ServiceOrderResponse>('POST', `/api/service-orders/${encodeURIComponent(id)}/${action}`),
   listTechnicianServiceOrders: (page: number) =>
     get<ServiceOrderListItemResponse[]>(`/api/service-orders?${pageQuery(page, PAGE_SIZE)}`, fetch),
   getTechnicianServiceOrder: (id: string) =>
     get<TechnicianServiceOrderResponse>(`/api/service-orders/${encodeURIComponent(id)}`, fetch),
   getTechnicianServiceVisits: (orderId: string) => get<ServiceVisitsResponse>(visitPath(orderId), fetch),
+  getServiceReport: (orderId: string) => get<ServiceReportResponse>(reportPath(orderId)),
   getTechnicianServiceReport: (orderId: string) => get<ServiceReportResponse>(reportPath(orderId), fetch),
   saveReportDraft: (orderId: string, draft: ReportDraftRequest) =>
     mutate<ServiceReportResponse>('PUT', reportPath(orderId), draft, { fetcher: fetch }),

@@ -29,6 +29,7 @@ export function OrderAssignmentCard({ orderId, orderStatus }: { orderId: string;
   const branches = useAllBranches();
   const [editing, setEditing] = useState(false);
   const editable = ASSIGNABLE_STATUSES.includes(orderStatus);
+  const finished = ['CLOSED', 'CANCELLED'].includes(orderStatus);
   const data = assignment.data;
   const empty = data && data.branches.length === 0 && data.technicians.length === 0;
 
@@ -51,7 +52,13 @@ export function OrderAssignmentCard({ orderId, orderStatus }: { orderId: string;
   } else if (assignment.isError) {
     body = <ErrorState message={errorMessage(assignment.error)} onRetry={() => void assignment.refetch()} />;
   } else if (empty) {
-    body = <p className="muted">Zlecenie czeka na przydział oddziałów lub serwisantów.</p>;
+    body = (
+      <p className="muted">
+        {finished
+          ? 'Przydziały zakończyły się wraz z zakończeniem zlecenia.'
+          : 'Zlecenie czeka na przydział oddziałów lub serwisantów.'}
+      </p>
+    );
   } else {
     body = (
       <dl className="details-list assignment-list">
@@ -93,7 +100,7 @@ export function OrderAssignmentCard({ orderId, orderStatus }: { orderId: string;
         {action}
       </header>
       {body}
-      {data && !editable && (
+      {data && !editable && !finished && (
         <p className="field-hint assignment-note">Przydział można zmienić tylko przed potwierdzeniem terminu wizyty.</p>
       )}
       {editing && data && <AssignmentModal assignment={data} onClose={() => setEditing(false)} />}

@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { Field } from '../components/Field';
 import type { OwnerRegistrationRequest } from '../types';
+import { BrandMark } from '../components/BrandMark';
 
 export function SignUpPage() {
   const navigate = useNavigate();
@@ -65,7 +66,7 @@ export function SignUpPage() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-brand">
-          <span className="brand-mark" aria-hidden>S</span>
+          <BrandMark />
           <span className="brand-name">Serwio</span>
         </div>
         <h1>Zarejestruj się</h1>

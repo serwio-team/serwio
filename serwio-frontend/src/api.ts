@@ -233,6 +233,8 @@ export const api = {
   listServiceOrders,
   createServiceOrder: (data: ServiceOrderRequest) => mutate<ServiceOrderResponse>('POST', '/api/service-orders', data),
   getServiceOrder: (id: string) => get<ServiceOrderResponse>(`/api/service-orders/${encodeURIComponent(id)}`),
+  listCompanyServiceOrders: (page: number, status?: string) =>
+    get<ServiceOrderListItemResponse[]>(`/api/service-orders?${pageQuery(page, PAGE_SIZE, { status })}`),
   listTechnicianServiceOrders: (page: number) =>
     get<ServiceOrderListItemResponse[]>(`/api/service-orders?${pageQuery(page, PAGE_SIZE)}`, fetch),
   getTechnicianServiceOrder: (id: string) =>

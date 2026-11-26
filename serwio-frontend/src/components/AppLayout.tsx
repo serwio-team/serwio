@@ -40,6 +40,7 @@ const NAV_BY_ROLE: Record<string, { section: string; items: NavItem[] }> = {
       { to: '/company', label: 'Pulpit', icon: LayoutDashboard },
       { to: '/company/branches', label: 'Oddziały', icon: Building2 },
       { to: '/company/technicians', label: 'Serwisanci', icon: Users },
+      { to: '/company/orders', label: 'Zlecenia', icon: ClipboardList },
     ],
   },
   TECHNICIAN: {

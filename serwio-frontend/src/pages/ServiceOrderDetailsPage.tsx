@@ -10,6 +10,12 @@ import { VisitScheduling } from '../components/VisitScheduling';
 import { useServiceOrder } from '../queries';
 import type { ServiceOrderResponse, TechnicianServiceOrderResponse, UserAccountResponse } from '../types';
 
+const BACK_LINKS: Record<string, { to: string; label: string }> = {
+  ASSET_OWNER: { to: '/orders', label: 'Zlecenia' },
+  SERVICE_COMPANY: { to: '/company/orders', label: 'Zlecenia' },
+  TECHNICIAN: { to: '/technician/orders', label: 'Moje zlecenia' },
+};
+
 const formatDate = (value: string) =>
   new Date(value).toLocaleString('pl-PL', { dateStyle: 'long', timeStyle: 'short' });
 
@@ -20,9 +26,10 @@ export function ServiceOrderDetailsPage() {
   const order = useServiceOrder(id, technician ? user.id : undefined);
   const data = order.data;
 
+  const back = BACK_LINKS[user.role] ?? BACK_LINKS.ASSET_OWNER;
   const backLink = (
-    <Link to={technician ? '/technician/orders' : '/orders'} className="back-link">
-      <ArrowLeft size={14} aria-hidden /> {technician ? 'Moje zlecenia' : 'Zlecenia'}
+    <Link to={back.to} className="back-link">
+      <ArrowLeft size={14} aria-hidden /> {back.label}
     </Link>
   );
 
@@ -61,7 +68,7 @@ export function ServiceOrderDetailsPage() {
         </div>
       </header>
 
-      {data ? <OrderDetails order={data} technician={technician} /> : <OrderDetailsSkeleton />}
+      {data ? <OrderDetails order={data} role={user.role} /> : <OrderDetailsSkeleton />}
       {data && technician && (
         <Fragment key={data.id}>
           <VisitScheduling orderId={data.id} userId={user.id}
@@ -74,10 +81,12 @@ export function ServiceOrderDetailsPage() {
   );
 }
 
-function OrderDetails({ order, technician }: {
+function OrderDetails({ order, role }: {
   order: ServiceOrderResponse | TechnicianServiceOrderResponse;
-  technician: boolean;
+  role: string;
 }) {
+  const technician = role === 'TECHNICIAN';
+  const owner = role === 'ASSET_OWNER';
   const coordinatorName = 'coordinator' in order ? order.coordinator?.displayName.trim() : undefined;
   const closedAt = 'closedAt' in order ? order.closedAt : null;
 
@@ -99,9 +108,9 @@ function OrderDetails({ order, technician }: {
             <dd><ServiceOrderStatusBadge status={order.currentStatus} /></dd>
           </div>
           <div>
-            <dt>{technician ? 'Obiekt' : 'Urządzenie'}</dt>
+            <dt>{owner ? 'Urządzenie' : 'Obiekt'}</dt>
             <dd>
-              {technician ? order.serviceObjectName : (
+              {!owner ? order.serviceObjectName : (
                 <Link to={`/service-objects/${encodeURIComponent(order.serviceObjectId)}`} className="cell-link">
                   {order.serviceObjectName}
                 </Link>

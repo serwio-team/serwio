@@ -18,6 +18,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useCurrentCompany, useCurrentOwner, useCurrentTechnician } from '../queries';
 import type { UserAccountResponse } from '../types';
+import { BrandMark } from './BrandMark';
 
 interface NavItem {
   to: string;
@@ -69,7 +70,7 @@ export function AppLayout({ user, children }: { user: UserAccountResponse; child
     <div className={`shell${menuOpen ? ' shell-menu-open' : ''}`}>
       <aside className="sidebar" aria-label="Menu główne">
         <div className="sidebar-brand">
-          <span className="brand-mark" aria-hidden>S</span>
+          <BrandMark />
           <span className="brand-name">Serwio</span>
           <button type="button" className="btn-icon sidebar-close" onClick={() => setMenuOpen(false)} aria-label="Zamknij menu">
             <X size={16} />

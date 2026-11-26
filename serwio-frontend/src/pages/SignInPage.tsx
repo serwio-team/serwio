@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { api, errorMessage } from '../api';
 import { useCurrentUser } from '../queries';
+import { BrandMark } from '../components/BrandMark';
 
 interface SignInState {
   reason?: 'expired' | 'signed-out' | 'registered';
@@ -49,7 +50,7 @@ export function SignInPage() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-brand">
-          <span className="brand-mark" aria-hidden>S</span>
+          <BrandMark />
           <span className="brand-name">Serwio</span>
         </div>
         <h1>Zaloguj się</h1>

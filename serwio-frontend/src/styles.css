@@ -92,11 +92,7 @@ code { font-size: 0.9em; background: var(--surface-2); border: 1px solid var(--b
   border-right: 1px solid var(--sidebar-border); color: var(--sidebar-text);
 }
 .sidebar-brand { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 16px; }
-.brand-mark {
-  display: grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; flex: none;
-  background: linear-gradient(135deg, #6c78e0, #4c57c2); color: #fff; font-weight: 650; font-size: 13px;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.2);
-}
+.brand-mark { display: block; flex: none; }
 .brand-name { font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
 .sidebar .brand-name { color: var(--sidebar-text-strong); }
 .sidebar-close { display: none; margin-left: auto; color: var(--sidebar-text); }
@@ -402,6 +398,8 @@ tr:hover .row-actions, .row-actions:focus-within { opacity: 1; }
 .auth-form .field { margin-bottom: 16px; }
 .auth-form .btn-block { margin-top: 4px; }
 .auth-link { margin-top: 20px; text-align: center; }
+.auth-link a { color: var(--accent); font-weight: 500; text-decoration: none; }
+.auth-link a:hover { color: var(--accent-hover); text-decoration: underline; }
 
 .fullpage { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
 .fullpage-card {

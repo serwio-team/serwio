@@ -1,78 +1,78 @@
 <div align="center">
 
-<img src="serwio-frontend/public/logo.svg" alt="Znak Serwio" width="80" height="80" />
+<img src="serwio-frontend/public/logo.svg" alt="Serwio logo" width="80" height="80" />
 
 <h1>Serwio</h1>
 
 <p>
-  Platforma do obsługi zleceń serwisowych: od zgłoszenia przez właściciela obiektu<br />
-  po wizytę serwisanta, raport i historię prac.
+  A platform for service work orders: from an asset owner's request<br />
+  to a technician's visit, the service report and the maintenance history.
 </p>
 
 <p>
-  <a href="docs/serwio_specyfikacja_v0.1.md"><strong>Specyfikacja »</strong></a>
+  <a href="docs/serwio_specyfikacja_v0.1.md"><strong>Read the specification »</strong></a>
   <br />
   <br />
-  <a href="#uruchomienie">Uruchomienie</a>
+  <a href="#getting-started">Getting started</a>
   &middot;
-  <a href="docs/testing.md">Testy</a>
+  <a href="docs/testing.md">Tests</a>
   &middot;
-  <a href="https://github.com/serwio-team/serwio/issues/new?labels=bug">Zgłoś błąd</a>
+  <a href="https://github.com/serwio-team/serwio/issues/new?labels=bug">Report a bug</a>
 </p>
 
 [![CI][ci-shield]][ci-url]
 
 </div>
 
-## O projekcie
+## About the project
 
-![Serwio: zlecenia serwisowe od zgłoszenia do raportu](docs/images/social-preview.png)
+![Serwio: service orders from request to report](docs/images/social-preview.png)
 
-Serwio łączy trzy strony zlecenia serwisowego w jednej aplikacji webowej. Właściciel
-obiektu, czyli np. restauracja, hotel lub zakład, zgłasza naprawę albo przegląd urządzenia.
-Firma serwisowa przydziela je oddziałom i serwisantom. Serwisant uzgadnia termin, wykonuje
-wizytę i przygotowuje raport, który zostaje w historii obiektu.
+Serwio brings all three parties of a service order into one web app. An asset owner, such as
+a restaurant, hotel or factory, requests a repair or an inspection of a device. The service
+company assigns the order to its branches and technicians. A technician agrees on a time,
+carries out the visit and writes a report that stays in the asset's history.
 
-Model nie zakłada jednej branży: obiektem może być pompa ciepła, klimatyzator, ekspres do
-kawy albo linia produkcyjna.
+The model is not tied to one industry: an asset can be a heat pump, an air conditioner,
+a coffee machine or a production line. The interface is in Polish.
 
-## Jak to działa
+## How it works
 
-| Rola | Co robi w Serwio |
+| Role | What they do in Serwio |
 | --- | --- |
-| **Właściciel obiektu** | Zakłada konto, dodaje lokalizacje z godzinami dostępności i urządzenia, tworzy zlecenia, akceptuje terminy i potwierdza wykonanie |
-| **Firma serwisowa** | Zarządza oddziałami i serwisantami, przydziela zlecenia całym oddziałom lub wybranym osobom, planuje wizyty i zamyka zlecenia |
-| **Serwisant** | Widzi zlecenia swojego oddziału i własne, proponuje terminy, realizuje wizyty i pisze raport |
+| **Asset owner** | Signs up, adds locations with opening hours and devices, creates orders, accepts visit times and confirms completed work |
+| **Service company** | Manages branches and technicians, assigns orders to whole branches or selected people, plans visits and closes orders |
+| **Technician** | Sees orders for their branch and their own, proposes visit times, carries out visits and writes the report |
 
 ```mermaid
 flowchart LR
-    A[Zlecenie<br/>właściciela] --> B[Przydział<br/>oddział lub osoba]
-    B --> C[Uzgodnienie<br/>terminu]
-    C --> D[Wizyta<br/>serwisanta]
-    D -->|potrzebny powrót| C
-    D --> E[Raport]
-    E --> F[Zamknięcie<br/>i historia]
+    A[Owner's<br/>order] --> B[Assignment<br/>branch or person]
+    B --> C[Agree on<br/>a time]
+    C --> D[Technician's<br/>visit]
+    D -->|revisit needed| C
+    D --> E[Report]
+    E --> F[Closure<br/>and history]
 ```
 
-Proponowany termin musi mieścić się w godzinach dostępności lokalizacji i nie może
-kolidować z innymi wizytami wykonawców. Backend sprawdza to także w chwili akceptacji.
+A proposed visit must fit within the location's opening hours and must not clash with other
+visits of the assigned technicians. The backend checks this again when the time is accepted.
 
-## Zrzuty ekranu
+## Screenshots
 
 <table>
   <tr>
-    <td width="33%"><a href="docs/images/company-orders.png"><img src="docs/images/company-orders.png" alt="Lista zleceń firmy serwisowej ze statusami" /></a></td>
-    <td width="33%"><a href="docs/images/owner-visit-proposal.png"><img src="docs/images/owner-visit-proposal.png" alt="Właściciel akceptuje proponowany termin wizyty" /></a></td>
-    <td width="33%"><a href="docs/images/technician-order.png"><img src="docs/images/technician-order.png" alt="Szczegóły zlecenia i dostępność lokalizacji u serwisanta" /></a></td>
+    <td width="33%"><a href="docs/images/company-orders.png"><img src="docs/images/company-orders.png" alt="Service company's order list with statuses" /></a></td>
+    <td width="33%"><a href="docs/images/owner-visit-proposal.png"><img src="docs/images/owner-visit-proposal.png" alt="Asset owner accepting a proposed visit time" /></a></td>
+    <td width="33%"><a href="docs/images/technician-order.png"><img src="docs/images/technician-order.png" alt="Technician's view of visits and location opening hours" /></a></td>
   </tr>
   <tr>
-    <td align="center"><b>Firma serwisowa</b><br />lista zleceń ze statusami</td>
-    <td align="center"><b>Właściciel</b><br />akceptacja terminu wizyty</td>
-    <td align="center"><b>Serwisant</b><br />zlecenie i godziny lokalizacji</td>
+    <td align="center"><b>Service company</b><br />order list with statuses</td>
+    <td align="center"><b>Asset owner</b><br />accepting a visit time</td>
+    <td align="center"><b>Technician</b><br />visit and opening hours</td>
   </tr>
 </table>
 
-## Technologie
+## Built with
 
 [![Java][java-shield]][java-url]
 [![Spring Boot][spring-shield]][spring-url]
@@ -82,92 +82,94 @@ kolidować z innymi wizytami wykonawców. Backend sprawdza to także w chwili ak
 [![Vite][vite-shield]][vite-url]
 [![TanStack Query][tanstack-shield]][tanstack-url]
 
-## Uruchomienie
+## Getting started
 
-### Wymagania
+### Prerequisites
 
 - JDK 21
 - Node.js 24
-- Docker, tylko przy trwałej bazie PostgreSQL
+- Docker, only for the persistent PostgreSQL database
 
-### Szybki start bez Dockera
+### Quick start without Docker
 
-1. Skopiuj konfigurację w głównym folderze repozytorium:
+1. Copy the configuration in the repository root:
    ```sh
    cp .env.example .env
    ```
-2. W pliku `.env` ustaw tymczasową bazę i hasło kont testowych:
+2. In `.env`, switch to the temporary database and set the test account password:
    ```sh
    TEMP_DB=true
    SEED_DATA=true
-   SEED_PASSWORD=wybierz-wlasne-haslo
+   SEED_PASSWORD=choose-your-own-password
    ```
-3. Uruchom backend na `localhost:8080`:
+3. Start the backend on `localhost:8080`:
    ```sh
    cd serwio-backend
    ./mvnw spring-boot:run
    ```
-4. W drugim terminalu uruchom frontend:
+4. In a second terminal, start the frontend:
    ```sh
    cd serwio-frontend
    npm ci
    npm run dev
    ```
-5. Otwórz <http://localhost:5173/sign-in> i zaloguj się jednym z kont testowych.
+5. Open <http://localhost:5173/sign-in> and sign in with one of the test accounts.
 
-| Konto | Rola |
+| Account | Role |
 | --- | --- |
-| `owner@example.com` | Właściciel z lokalizacją i dwoma urządzeniami |
-| `company@example.com` | Firma serwisowa z oddziałem |
-| `technician@example.com` | Serwisant tego oddziału |
+| `owner@example.com` | Asset owner with a location and two devices |
+| `company@example.com` | Service company with one branch |
+| `technician@example.com` | Technician in that branch |
 
-Hasłem każdego konta jest `SEED_PASSWORD`. Baza H2 działa w pamięci, więc dane znikają
-po zatrzymaniu backendu. Nowego właściciela można też zarejestrować na `/sign-up`.
+Every account uses `SEED_PASSWORD`. The H2 database lives in memory, so the data is gone
+once the backend stops. You can also register a new asset owner at `/sign-up`.
 
-### Trwała baza PostgreSQL
+### Persistent PostgreSQL database
 
-Ustaw `TEMP_DB=false` i własne `DB_PASSWORD`. Backend sam uruchomi kontener PostgreSQL 17
-z `serwio-backend/compose.yaml`. Opis wszystkich zmiennych znajdziesz w
+Set `TEMP_DB=false` and your own `DB_PASSWORD`. The backend starts a PostgreSQL 17 container
+from `serwio-backend/compose.yaml` on its own. All variables are described in
 [`.env.example`](.env.example).
 
-## Testy
+## Tests
 
 ```sh
 cd serwio-backend && ./mvnw verify
 cd serwio-frontend && npm test && npm run build
 ```
 
-Backend ma testy reguł domenowych, testy API oraz dwa pełne scenariusze HTTP: naprawę
-i przegląd z ponowną wizytą. Raport pokrycia JaCoCo powstaje w
-`serwio-backend/target/site/jacoco`. GitHub Actions uruchamia te testy dla każdego PR-a,
-a scenariusze HTTP także na PostgreSQL 17. Szczegóły: [docs/testing.md](docs/testing.md).
+The backend has domain rule tests, API tests and two end-to-end HTTP scenarios: a repair
+and an inspection that needs a second visit. The JaCoCo coverage report is written to
+`serwio-backend/target/site/jacoco`. GitHub Actions runs these tests on every pull request
+and runs the HTTP scenarios on PostgreSQL 17 as well. Details: [docs/testing.md](docs/testing.md).
 
-## Dokumentacja
+## Documentation
 
-- [Specyfikacja MVP](docs/serwio_specyfikacja_v0.1.md): pojęcia, role, procesy i bezpieczeństwo
-- [Wygląd aplikacji](docs/design.md): znak, kolory, statusy i typografia
-- [Diagram ERD](docs/erd/serwio_erd_mvp_diagram.png) i [słownik pojęć](docs/erd/serwio_erd_mvp_slownik_pojec.md)
-- Kontrakty API: [przydziały](docs/order-assignment.md), [zlecenia serwisanta](docs/technician-orders.md), [wizyty](docs/service-visits.md), [raporty](docs/service-reports.md), [dostępność lokalizacji](docs/location-availability.md)
+The documents below are written in Polish.
 
-## Plany rozwoju
+- [MVP specification](docs/serwio_specyfikacja_v0.1.md): terms, roles, processes and security
+- [Design guide](docs/design.md): logo, colours, statuses and typography
+- [ERD diagram](docs/erd/serwio_erd_mvp_diagram.png) and [glossary](docs/erd/serwio_erd_mvp_slownik_pojec.md)
+- API contracts: [assignments](docs/order-assignment.md), [technician orders](docs/technician-orders.md), [visits](docs/service-visits.md), [reports](docs/service-reports.md), [location availability](docs/location-availability.md)
 
-- [x] Konta i role: właściciel, firma, serwisant
-- [x] Lokalizacje z tygodniową dostępnością i urządzenia
-- [x] Zlecenia z przydziałem do oddziałów i osób
-- [x] Wizyty, uzgadnianie terminów i raport serwisowy
-- [ ] Kody QR identyfikujące obiekt
-- [ ] Zdjęcia i dokumenty
-- [ ] Zgłoszenia usterek od klientów końcowych
-- [ ] Aplikacja mobilna serwisanta
-- [ ] Wiele firm na jednej platformie (SaaS)
+## Roadmap
 
-## Autorzy
+- [x] Accounts and roles: owner, company, technician
+- [x] Locations with weekly opening hours, and devices
+- [x] Orders assigned to branches and people
+- [x] Visits, scheduling and the service report
+- [ ] QR codes that identify an asset
+- [ ] Photos and documents
+- [ ] Fault reports from end customers
+- [ ] Mobile app for technicians
+- [ ] Multiple companies on one platform (SaaS)
+
+## Contributors
 
 <a href="https://github.com/serwio-team/serwio/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=serwio-team/serwio" alt="Autorzy projektu" />
+  <img src="https://contrib.rocks/image?repo=serwio-team/serwio" alt="Project contributors" />
 </a>
 
-<!-- LINKI I OBRAZY -->
+<!-- LINKS AND IMAGES -->
 [ci-shield]: https://github.com/serwio-team/serwio/actions/workflows/ci.yml/badge.svg?branch=main
 [ci-url]: https://github.com/serwio-team/serwio/actions/workflows/ci.yml
 [java-shield]: https://img.shields.io/badge/Java_21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white

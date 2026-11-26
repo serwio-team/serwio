@@ -239,3 +239,33 @@ export interface TechnicianServiceOrderResponse extends ServiceOrderListItemResp
   description: string;
   coordinator: { id: string; displayName: string } | null;
 }
+
+export interface VisitTimeRange {
+  startsAt: string;
+  endsAt: string;
+}
+
+export interface VisitProposal extends VisitTimeRange {
+  id: string;
+  proposedBy: 'OWNER' | 'COORDINATOR';
+}
+
+export interface ServiceVisit {
+  id: string;
+  status: 'DRAFT' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  coordinatorTechnicianId: string;
+  currentProposal: VisitProposal | null;
+  startsAt: string | null;
+  endsAt: string | null;
+}
+
+export interface ServiceVisitsResponse {
+  timezone: string;
+  availability: AvailabilityDay[];
+  visits: ServiceVisit[];
+}
+
+export type VisitNegotiation =
+  | { action: 'propose'; visitId: string; time: VisitTimeRange }
+  | { action: 'counter'; visitId: string; proposalId: string; time: VisitTimeRange }
+  | { action: 'accept' | 'reject'; visitId: string; proposalId: string };

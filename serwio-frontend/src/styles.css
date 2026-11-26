@@ -441,6 +441,23 @@ tr:hover .row-actions, .row-actions:focus-within { opacity: 1; }
 .details-list dd { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
 .details-sub { display: block; font-weight: 400; color: var(--text-2); font-size: 13px; }
 
+.visit-scheduling { margin-top: 24px; }
+.visit-scheduling > .visit-heading { margin-bottom: 12px; }
+.visit-heading, .visit-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.visit-heading { justify-content: space-between; }
+.visit-heading h2 { font-size: 17px; }
+.visit-heading h3, .visit-card h4 { font-size: 14px; }
+.visit-layout { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+.visit-list, .visit-card { display: grid; gap: 12px; }
+.visit-loading { display: flex; align-items: center; gap: 8px; }
+.visit-range { display: grid; gap: 3px; margin: 6px 0; }
+.visit-range > div { display: flex; flex-wrap: wrap; gap: 5px 8px; }
+.visit-range dt { color: var(--text-2); }
+.visit-range dd { margin: 0; }
+.visit-form { border-top: 1px solid var(--border); padding-top: 12px; }
+.work-report { margin-top: 24px; }
+.work-report-hint { margin: 8px 0 12px; }
+
 @media (max-width: 860px) {
   .sidebar { transform: translateX(-100%); transition: transform 0.2s ease; box-shadow: none; }
   .shell-menu-open .sidebar { transform: none; box-shadow: var(--shadow-lg); }

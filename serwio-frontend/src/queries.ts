@@ -4,6 +4,7 @@ import type {
   AvailabilityRequest,
   LocationRequest,
   PasswordChangeRequest,
+  ReportDraftRequest,
   ServiceBranchRequest,
   ServiceObjectRequest,
   ServiceOrderRequest,
@@ -12,6 +13,7 @@ import type {
   TechnicianPasswordRequest,
   TechnicianServiceOrderResponse,
   TechnicianUpdateRequest,
+  VisitAction,
 } from './types';
 
 export const queryKeys = {
@@ -33,6 +35,8 @@ export const queryKeys = {
   serviceOrder: (id: string) => ['service-orders', 'detail', id] as const,
   technicianOrderList: (userId: string) => ['technician-orders', userId, 'list'] as const,
   technicianOrder: (userId: string, id: string) => ['technician-orders', userId, 'detail', id] as const,
+  serviceVisits: (userId: string, orderId: string) => ['service-visits', userId, orderId] as const,
+  serviceReport: (userId: string, orderId: string) => ['service-report', userId, orderId] as const,
   companySummary: ['companies', 'me', 'summary'] as const,
   branches: ['branches'] as const,
   branchList: ['branches', 'list'] as const,
@@ -204,6 +208,79 @@ export function useServiceOrder(id: string | undefined, technicianUserId?: strin
     queryKey: technicianUserId ? queryKeys.technicianOrder(technicianUserId, id ?? '') : queryKeys.serviceOrder(id ?? ''),
     queryFn: () => technicianUserId ? api.getTechnicianServiceOrder(id!) : api.getServiceOrder(id!),
     enabled: Boolean(id),
+  });
+}
+
+export function useServiceVisits(userId: string, orderId: string) {
+  return useQuery({
+    queryKey: queryKeys.serviceVisits(userId, orderId),
+    queryFn: () => api.listServiceVisits(orderId),
+  });
+}
+
+export function useUpdateServiceVisit(userId: string, orderId: string) {
+  const queryClient = useQueryClient();
+  const refresh = () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: queryKeys.serviceVisits(userId, orderId) }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.technicianOrder(userId, orderId) }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.technicianOrderList(userId) }),
+  ]);
+
+  return useMutation({
+    mutationFn: (action: VisitAction) => api.updateServiceVisit(orderId, action),
+    onSuccess: refresh,
+    onError: (error) => {
+      if (error instanceof ApiError && (error.status === 403 || error.status === 404 || error.status === 409)) {
+        return refresh();
+      }
+    },
+  });
+}
+
+export function useServiceReport(userId: string, orderId: string) {
+  return useQuery({
+    queryKey: queryKeys.serviceReport(userId, orderId),
+    queryFn: async () => {
+      try {
+        return await api.getServiceReport(orderId);
+      } catch (error) {
+        if (isNotFound(error)) return null;
+        throw error;
+      }
+    },
+  });
+}
+
+type ReportUpdate =
+  | { action: 'save'; draft: ReportDraftRequest }
+  | { action: 'finalize'; draft?: ReportDraftRequest };
+
+export function useUpdateServiceReport(userId: string, orderId: string) {
+  const queryClient = useQueryClient();
+  const key = queryKeys.serviceReport(userId, orderId);
+
+  return useMutation({
+    onMutate: () => queryClient.cancelQueries({ queryKey: key }),
+    mutationFn: async (update: ReportUpdate) => {
+      if (update.action === 'save') return api.saveReportDraft(orderId, update.draft);
+      if (update.draft) {
+        const savedDraft = await api.saveReportDraft(orderId, update.draft);
+        queryClient.setQueryData(key, savedDraft);
+      }
+      return api.finalizeReport(orderId);
+    },
+    onSuccess: async (report) => {
+      await queryClient.cancelQueries({ queryKey: key });
+      queryClient.setQueryData(key, report);
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && (error.status === 403 || error.status === 404 || error.status === 409)) {
+        return Promise.all([
+          queryClient.invalidateQueries({ queryKey: key }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.technicianOrder(userId, orderId) }),
+        ]);
+      }
+    },
   });
 }
 

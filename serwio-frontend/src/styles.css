@@ -231,6 +231,13 @@ tr:hover .row-actions, .row-actions:focus-within { opacity: 1; }
 .visit-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .visit-term { font-weight: 500; }
 .visit-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.visit-zone { margin: -6px 0 12px; }
+.proposal-box {
+  display: grid; gap: 10px; padding: 12px; border-radius: var(--radius);
+  border: 1px solid var(--accent); background: var(--accent-soft);
+}
+.proposal-term { font-size: 14px; }
+.proposal-preview { margin: 0; font-size: 13px; color: var(--text-2); }
 .visit-history { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
 .visit-history summary { cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-2); }
 .visit-history .visit { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); }

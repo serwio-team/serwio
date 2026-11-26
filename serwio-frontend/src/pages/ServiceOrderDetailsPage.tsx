@@ -79,10 +79,13 @@ export function ServiceOrderDetailsPage() {
             orderType={data.orderType} coordinatorId={'coordinator' in data ? data.coordinator?.id : undefined} />
         </Fragment>
       )}
+      {data && user.role === 'ASSET_OWNER' && (
+        <OrderVisitsCard orderId={data.id} orderStatus={data.currentStatus} role={user.role} />
+      )}
       {data && user.role === 'SERVICE_COMPANY' && (
         <>
           <OrderAssignmentCard orderId={data.id} orderStatus={data.currentStatus} />
-          <OrderVisitsCard orderId={data.id} orderStatus={data.currentStatus} />
+          <OrderVisitsCard orderId={data.id} orderStatus={data.currentStatus} role={user.role} />
         </>
       )}
     </>

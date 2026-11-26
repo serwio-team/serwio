@@ -4,6 +4,7 @@ import type {
   ServiceVisitResponse,
   ServiceVisitsResponse,
   VisitStaffingRequest,
+  VisitTimeRange,
   VisitTechnicianResponse,
   OrderAssignmentRequest,
   OrderAssignmentResponse,
@@ -259,6 +260,17 @@ export const api = {
     mutate<ServiceVisitResponse>(
       'POST',
       `/api/service-orders/${encodeURIComponent(id)}/visits/${encodeURIComponent(visitId)}/cancel`,
+    ),
+  respondToProposal: (id: string, visitId: string, proposalId: string, action: 'accept' | 'reject') =>
+    mutate<ServiceVisitResponse>(
+      'POST',
+      `/api/service-orders/${encodeURIComponent(id)}/visits/${encodeURIComponent(visitId)}/proposals/${encodeURIComponent(proposalId)}/${action}`,
+    ),
+  counterProposal: (id: string, visitId: string, proposalId: string, data: VisitTimeRange) =>
+    mutate<ServiceVisitResponse>(
+      'POST',
+      `/api/service-orders/${encodeURIComponent(id)}/visits/${encodeURIComponent(visitId)}/proposals/${encodeURIComponent(proposalId)}/counter`,
+      data,
     ),
   listTechnicianServiceOrders: (page: number) =>
     get<ServiceOrderListItemResponse[]>(`/api/service-orders?${pageQuery(page, PAGE_SIZE)}`, fetch),

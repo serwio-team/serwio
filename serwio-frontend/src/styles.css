@@ -455,6 +455,8 @@ tr:hover .row-actions, .row-actions:focus-within { opacity: 1; }
 .visit-range dt { color: var(--text-2); }
 .visit-range dd { margin: 0; }
 .visit-form { border-top: 1px solid var(--border); padding-top: 12px; }
+.work-report { margin-top: 24px; }
+.work-report-hint { margin: 8px 0 12px; }
 
 @media (max-width: 860px) {
   .sidebar { transform: translateX(-100%); transition: transform 0.2s ease; box-shadow: none; }

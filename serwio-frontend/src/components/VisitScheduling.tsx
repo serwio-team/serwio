@@ -1,9 +1,11 @@
 import { CalendarClock, Loader2, RefreshCw } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
 import { ApiError, errorMessage } from '../api';
 import { editableWeek, WEEKDAYS } from '../availability';
-import { useCurrentTechnician, useNegotiateVisit, useServiceVisits } from '../queries';
-import type { ServiceVisit, ServiceVisitsResponse, VisitNegotiation } from '../types';
+import { useCurrentTechnician, useServiceVisits, useUpdateServiceVisit } from '../queries';
+import type { ServiceVisit, ServiceVisitsResponse, VisitAction, VisitOutcome } from '../types';
 import { EmptyState, ErrorState } from './DataState';
+import { SelectField } from './Field';
 import { VisitTimeForm } from './VisitTimeForm';
 
 const STATUS_LABELS: Record<ServiceVisit['status'], string> = {
@@ -14,31 +16,43 @@ const STATUS_LABELS: Record<ServiceVisit['status'], string> = {
   CANCELLED: 'Anulowana',
 };
 
-export function VisitScheduling({ orderId, userId }: { orderId: string; userId: string }) {
+const OUTCOME_LABELS: Record<VisitOutcome, string> = {
+  COMPLETED: 'Wykonane',
+  REVISIT_REQUIRED: 'Wymaga ponownej wizyty',
+};
+
+export function VisitScheduling({ orderId, userId, orderStatus, onRefreshOrder }: {
+  orderId: string;
+  userId: string;
+  orderStatus: string;
+  onRefreshOrder: () => void;
+}) {
   const profile = useCurrentTechnician();
   const query = useServiceVisits(userId, orderId);
-  const negotiation = useNegotiateVisit(userId, orderId);
-  const apiError = negotiation.error instanceof ApiError ? negotiation.error : undefined;
+  const update = useUpdateServiceVisit(userId, orderId);
+  const apiError = update.error instanceof ApiError ? update.error : undefined;
   const { data } = query;
 
   return (
     <section className="visit-scheduling" aria-labelledby="visit-scheduling-title">
       <header className="visit-heading">
-        <h2 id="visit-scheduling-title">Uzgadnianie terminu wizyty</h2>
+        <h2 id="visit-scheduling-title">Wizyty serwisowe</h2>
         {data && (
           <button type="button" className="btn btn-secondary btn-sm"
-            disabled={query.isFetching || negotiation.isPending}
+            disabled={query.isFetching || update.isPending}
             onClick={() => {
-              negotiation.reset();
+              update.reset();
+              onRefreshOrder();
               void query.refetch();
             }}>
             <RefreshCw size={14} aria-hidden /> Odśwież
           </button>
         )}
       </header>
-      {negotiation.error && (
+      {update.isPending && <p role="status" className="inline-alert inline-alert-info">Zapisywanie zmian…</p>}
+      {update.error && (
         <p role="alert" className="inline-alert inline-alert-error">
-          {errorMessage(negotiation.error)}
+          {errorMessage(update.error)}
           {apiError?.code === 'STALE_PROPOSAL' && ' Sprawdź bieżącą propozycję.'}
         </p>
       )}
@@ -54,7 +68,8 @@ export function VisitScheduling({ orderId, userId }: { orderId: string; userId: 
         <div className="details-layout visit-layout">
           <WeeklyAvailability availability={data.availability} timezone={data.timezone} />
           <div className="visit-list">
-            {profile.isError && data.visits.some((visit) => visit.status === 'DRAFT') && (
+            {profile.isError && data.visits.some(({ status }) =>
+              status === 'DRAFT' || status === 'CONFIRMED' || status === 'IN_PROGRESS') && (
               <div className="card">
                 <ErrorState message="Nie udało się sprawdzić, czy jesteś koordynatorem wizyty."
                   onRetry={() => void profile.refetch()} />
@@ -67,11 +82,11 @@ export function VisitScheduling({ orderId, userId }: { orderId: string; userId: 
               </div>
             )}
             {data.visits.map((visit) => (
-              <VisitCard key={visit.id} visit={visit} timezone={data.timezone}
-                canNegotiate={profile.isSuccess && profile.data.id === visit.coordinatorTechnicianId}
-                pending={negotiation.isPending}
-                fieldErrors={negotiation.variables?.visitId === visit.id ? apiError?.fieldErrors ?? {} : {}}
-                onChange={negotiation.reset} onAction={negotiation.mutate} />
+              <VisitCard key={visit.id} visit={visit} timezone={data.timezone} orderStatus={orderStatus}
+                isCoordinator={profile.isSuccess && profile.data.id === visit.coordinatorTechnicianId}
+                pending={update.isPending}
+                fieldErrors={update.variables?.visitId === visit.id ? apiError?.fieldErrors ?? {} : {}}
+                onChange={update.reset} onAction={update.mutate} />
             ))}
           </div>
         </div>
@@ -100,18 +115,21 @@ function WeeklyAvailability({ availability, timezone }: Pick<ServiceVisitsRespon
 interface VisitCardProps {
   visit: ServiceVisit;
   timezone: string;
-  canNegotiate: boolean;
+  orderStatus: string;
+  isCoordinator: boolean;
   pending: boolean;
   fieldErrors: Record<string, string[]>;
   onChange: () => void;
-  onAction: (action: VisitNegotiation) => void;
+  onAction: (action: VisitAction) => void;
 }
 
-function VisitCard({ visit, timezone, canNegotiate, pending, fieldErrors, onChange, onAction }: VisitCardProps) {
+function VisitCard({ visit, timezone, orderStatus, isCoordinator, pending, fieldErrors, onChange, onAction }: VisitCardProps) {
   const proposal = visit.currentProposal;
   const isDraft = visit.status === 'DRAFT';
-  const canReply = canNegotiate && isDraft && proposal?.proposedBy === 'OWNER';
-  const canPropose = canNegotiate && isDraft && !proposal;
+  const canReply = isCoordinator && isDraft && proposal?.proposedBy === 'OWNER';
+  const canPropose = isCoordinator && isDraft && !proposal;
+  const canStart = isCoordinator && visit.status === 'CONFIRMED' && orderStatus === 'VISIT_CONFIRMED';
+  const canComplete = isCoordinator && visit.status === 'IN_PROGRESS' && orderStatus === 'IN_PROGRESS';
 
   return (
     <section className="card details-card visit-card">
@@ -134,6 +152,24 @@ function VisitCard({ visit, timezone, canNegotiate, pending, fieldErrors, onChan
           <VisitRange startsAt={visit.startsAt} endsAt={visit.endsAt} timezone={timezone} />
         </div>
       )}
+      {visit.outcome && (
+        <div>
+          <h4>Wynik wizyty</h4>
+          <p>{OUTCOME_LABELS[visit.outcome]}</p>
+        </div>
+      )}
+      {canStart && (
+        <div className="visit-actions">
+          <button type="button" className="btn btn-primary" disabled={pending}
+            onClick={() => onAction({ action: 'start', visitId: visit.id })}>
+            Rozpocznij wizytę
+          </button>
+        </div>
+      )}
+      {canComplete && (
+        <VisitCompletionForm pending={pending} errors={fieldErrors.outcome} onChange={onChange}
+          onSubmit={(outcome) => onAction({ action: 'complete', visitId: visit.id, outcome })} />
+      )}
       {isDraft && !proposal && !canPropose && <p className="muted">Oczekuje na propozycję koordynatora.</p>}
       {canReply && (
         <div className="visit-actions">
@@ -155,6 +191,34 @@ function VisitCard({ visit, timezone, canNegotiate, pending, fieldErrors, onChan
             : { action: 'propose', visitId: visit.id, time })} />
       )}
     </section>
+  );
+}
+
+function VisitCompletionForm({ pending, errors, onChange, onSubmit }: {
+  pending: boolean;
+  errors?: string[];
+  onChange: () => void;
+  onSubmit: (outcome: VisitOutcome) => void;
+}) {
+  const [outcome, setOutcome] = useState('');
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!pending && (outcome === 'COMPLETED' || outcome === 'REVISIT_REQUIRED')) onSubmit(outcome);
+  }
+
+  return (
+    <form className="visit-form" onSubmit={submit}>
+      <SelectField name="visitOutcome" label="Wynik wizyty" required disabled={pending} value={outcome} errors={errors}
+        onChange={(value) => {
+          setOutcome(value);
+          onChange();
+        }}>
+        <option value="">Wybierz wynik</option>
+        {Object.entries(OUTCOME_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      </SelectField>
+      <button type="submit" className="btn btn-primary" disabled={pending || !outcome}>Zakończ wizytę</button>
+    </form>
   );
 }
 

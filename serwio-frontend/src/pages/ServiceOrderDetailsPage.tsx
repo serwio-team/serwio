@@ -60,7 +60,10 @@ export function ServiceOrderDetailsPage() {
       </header>
 
       {data ? <OrderDetails order={data} technician={technician} /> : <OrderDetailsSkeleton />}
-      {data && technician && <VisitScheduling key={data.id} orderId={data.id} userId={user.id} />}
+      {data && technician && (
+        <VisitScheduling key={data.id} orderId={data.id} userId={user.id}
+          orderStatus={data.currentStatus} onRefreshOrder={() => void order.refetch()} />
+      )}
     </>
   );
 }
